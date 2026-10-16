@@ -67,6 +67,7 @@ layout(){ # <repo-dir>: prints the workspace path; COMFY_BASE is the attached Co
   echo "$ws"
 }
 base_at(){ # <tag>: move the attached ComfyUI-Base checkout to that tag
+  [ -n "${COMFY_BASE:-}" ] || { echo "ComfyUI-Base is not attached to this routine (its sources)"; return 1; }
   git -C "$COMFY_BASE" fetch -q --depth 1 origin "refs/tags/$1:refs/tags/$1" && git -C "$COMFY_BASE" -c advice.detachedHead=false checkout -q "$1"
 }
 newest_base(){
@@ -135,7 +136,7 @@ case "${1:-}" in
     fi
     rm -rf "$STATE"; mkdir -p "$STATE"; date +%s > "$STATE/start"
     COMFY_BASE="$(dirname "$PWD")/ComfyUI-Base"
-    [ -d "$COMFY_BASE/.git" ] || die "ComfyUI-Base is not attached beside $(basename "$PWD") (the routine's sources)"
+    [ -d "$COMFY_BASE/.git" ] || COMFY_BASE=""    # the workspace gate needs no base; the others say so when it is missing
     WS="$(layout "$PWD")"
     export COMFY_BASE WS STATE
     setsid nohup bash -c "cd '$PWD' && COMFY_BASE='$COMFY_BASE' WS='$WS' bash '$HERE/cloud-ci.sh' _run" > "$STATE/runner.log" 2>&1 < /dev/null &
