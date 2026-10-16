@@ -71,6 +71,14 @@ jobs:
         with:
           enable-cache: true
 
+      # The live App-view tier drives the real frontend through _build/appview.py, a uv script that pins its own
+      # playwright; the browser build has to match that pin, so it is installed per pinned version (none: no-op).
+      - name: Chromium for the App-view tier (each playwright version the package's _build pins)
+        run: |
+          for v in $(grep -rhoE 'playwright==[0-9.]+' "$NAME/_build" 2>/dev/null | sort -u | cut -d= -f3); do
+            uvx --from "playwright==$v" playwright install --with-deps chromium
+          done
+
       # The suites import what a pod has (torch, numpy, PIL, ComfyUI itself) and run their comfyui tier against a live
       # /object_info. On the Mac that is the shared testbed; here it is provisioned the same way: ComfyUI at its newest
       # release, the base packs and THIS package's packs at HEAD, a CPU venv, the server on 8199. verify.sh finds it
