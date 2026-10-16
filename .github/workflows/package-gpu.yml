@@ -1,0 +1,58 @@
+# The GPU tier, on the pod itself while it is up, called by hand from a package's .github/workflows/gpu.yml:
+#
+#   on: workflow_dispatch
+#   jobs:
+#     gpu:
+#       uses: SoulCraft-Org/.github/.github/workflows/package-gpu.yml@main
+#
+# The pod becomes the runner with ComfyUI Base 3.17.0's `podctl runner <pod>` (an ephemeral self-hosted runner labelled
+# gpu-pod: one job, then GitHub removes it; self-hosted minutes are free). With no such runner the job waits in Queued and
+# nothing bills: cancel it, or register the pod.
+#
+# It runs this ref's pod-only tiers (runpod, gpu) against the machine as installed: each row's file on disk at its size,
+# the packs, the loaders' dropdowns, the GPU imports in the base's venv. It installs nothing and restarts nothing; a job
+# reaches the GPU only through the machine's own ComfyUI. A real render stays the pod session's (podctl, App Mode).
+name: package-gpu
+
+on:
+  workflow_call:
+    inputs:
+      tiers:
+        description: "the suite's pod-only tiers to run (space-separated); a tier the suite does not declare is skipped and said"
+        type: string
+        default: "runpod gpu"
+
+permissions:
+  contents: read
+
+jobs:
+  gpu:
+    runs-on: [self-hosted, gpu-pod]
+    timeout-minutes: 30
+    env:
+      NAME: ${{ github.event.repository.name }}
+      TIERS: ${{ inputs.tiers }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: ${{ github.event.repository.name }}
+
+      - name: the machine
+        run: |
+          nvidia-smi --query-gpu=name,memory.used,memory.total --format=csv,noheader || true
+          base="${BASE_VOLUME:-/workspace}/comfy-base"
+          [ -f "$base/base.sh" ] || { echo "::error::no ComfyUI Base installed on this machine ($base)"; exit 1; }
+          echo "COMFY_BASE=$base" >> "$GITHUB_ENV"
+          echo "machine: $(cat "$base/VERSION") at $base" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: the pod-only tiers, against the machine
+        run: |
+          rc=0
+          for t in $TIERS; do
+            if grep -qE "^[[:space:]]+$t:" "$NAME/pytest.ini" 2>/dev/null; then
+              ( cd "$NAME" && bash "$NAME-script.sh" test "$t" ) || rc=1
+            else
+              echo "tier $t: not declared by this suite, skipped"
+            fi
+          done
+          exit $rc

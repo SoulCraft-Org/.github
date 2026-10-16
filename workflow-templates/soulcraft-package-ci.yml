@@ -1,9 +1,9 @@
 # The gate for a SoulCraft workflow package (SoulCraft-Org/.github/.github/workflows/package-ci.yml).
 name: ci
 
+# On each pull request (and by hand), not again on the merge: the pull request already ran it, and the release tag re-runs
+# it in package-release.yml.
 on:
-  push:
-    branches: [$default-branch]
   pull_request:
   workflow_dispatch:
 
