@@ -1,0 +1,116 @@
+# The gate every SoulCraft workflow package runs, called from its own .github/workflows/ci.yml:
+#
+#   jobs:
+#     verify:
+#       uses: SoulCraft-Org/.github/.github/workflows/package-ci.yml@main
+#       secrets: inherit
+#
+# The same three steps a maintainer runs before a commit (ComfyUI Base's _build/verify.sh), then the cast guard:
+#   1. <name>-<host>.zip matches the working tree       (package.py --check)
+#   2. the suite, from the repository                  (<name>-script.sh test)
+#   3. the suite, from the EXTRACTED zip                (what a pod runs)
+#   4. no name from the private test cast in the zip    (workspace's tools/cast/cast.py guard)
+# No GPU and no provisioned testbed here, so the comfyui/runpod/gpu tiers skip themselves by name.
+#
+# The layout is the base's workspace shape (py/pkgdirs.py, base 3.6.0): $GITHUB_WORKSPACE is the workspace, the package
+# is checked out at <workspace>/<name>, ComfyUI Base at <workspace>/ComfyUI-Base (a base checkout is never a package).
+name: package-ci
+
+on:
+  workflow_call:
+    inputs:
+      base-ref:
+        description: "ComfyUI Base tag or branch; empty = its newest base-v* tag (base 3.0.0: always the newest)"
+        type: string
+        default: ""
+      testbed:
+        description: "provision the shared testbed (ComfyUI, the packs, a CPU venv and server) before verify.sh"
+        type: boolean
+        default: true
+      require-cast-guard:
+        description: "fail when the cast guard cannot run (no soulcraft-ci app secrets); the release path sets it"
+        type: boolean
+        default: false
+    secrets:
+      CI_APP_ID:
+        required: false
+      CI_APP_KEY:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      NAME: ${{ github.event.repository.name }}
+      # where ComfyUI Base lives: the org variable once org/apply.sh has moved it, else its first home (GitHub redirects)
+      BASE_REPO: ${{ vars.COMFY_BASE_REPO || 'Soul-Craft/ComfyUI-Base' }}
+      HAS_APP: ${{ secrets.CI_APP_ID != '' && secrets.CI_APP_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: ${{ github.event.repository.name }}
+
+      - name: ComfyUI Base
+        run: |
+          ref="${{ inputs.base-ref }}"
+          if [ -z "$ref" ]; then
+            ref="$(git ls-remote --tags --refs "https://github.com/$BASE_REPO" 'base-v*' | sed 's|.*refs/tags/||' | sort -V | tail -1)"
+          fi
+          [ -n "$ref" ] || { echo "::error::no base-v* tag found on $BASE_REPO"; exit 1; }
+          git clone -q --depth 1 --branch "$ref" "https://github.com/$BASE_REPO" ComfyUI-Base
+          echo "ComfyUI Base $ref ($(cat ComfyUI-Base/VERSION))" >> "$GITHUB_STEP_SUMMARY"
+          echo "COMFY_BASE=$GITHUB_WORKSPACE/ComfyUI-Base" >> "$GITHUB_ENV"
+          echo "BASE_WORKSPACE=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+
+      # base_test reaches pytest through `uv run --no-project --python <newest> --with pytest`
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+
+      # The suites import what a pod has (torch, numpy, PIL, ComfyUI itself) and run their comfyui tier against a live
+      # /object_info. On the Mac that is the shared testbed; here it is provisioned the same way: ComfyUI at its newest
+      # release, the base packs and THIS package's packs at HEAD, a CPU venv, the server on 8199. verify.sh finds it
+      # beside the base (testbed/ and .testbed-server.port). Without it most suites fail on a missing torch or numpy.
+      - name: the shared testbed (ComfyUI + this package's packs, CPU server)
+        if: inputs.testbed
+        run: bash "$COMFY_BASE/testbed.sh" --server
+
+      - name: verify (zip, suite from the repo, suite from the zip)
+        run: bash "$COMFY_BASE/_build/verify.sh" "$NAME"
+
+      - name: stop the testbed
+        if: always() && inputs.testbed
+        run: bash "$COMFY_BASE/testbed.sh" --stop || true
+
+      - name: soulcraft-ci token (reads the private workspace for the cast guard)
+        id: app
+        if: env.HAS_APP == 'true'
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: workspace
+
+      - name: the workspace's cast tool
+        if: env.HAS_APP == 'true'
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository_owner }}/workspace
+          token: ${{ steps.app.outputs.token }}
+          path: workspace
+          sparse-checkout: tools/cast
+
+      - name: cast guard (no private test-cast name in the zip)
+        run: |
+          if [ "$HAS_APP" != "true" ]; then
+            msg="cast guard NOT run: the org secrets CI_APP_ID / CI_APP_KEY (the soulcraft-ci app) are not set"
+            if [ "${{ inputs.require-cast-guard }}" = "true" ]; then echo "::error::$msg"; exit 1; fi
+            echo "::warning::$msg"; exit 0
+          fi
+          host="$(python3 "$COMFY_BASE/_build/package.py" --host "$NAME")"
+          python3 workspace/tools/cast/cast.py guard "$NAME/$NAME-$host.zip"

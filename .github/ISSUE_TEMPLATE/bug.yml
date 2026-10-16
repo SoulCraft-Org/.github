@@ -1,0 +1,26 @@
+name: Something does not work
+description: A workflow, the base or a tool did something it should not, or failed
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The first line of the handbook, or the version the "SoulCraft Status" workflow shows
+      placeholder: Krea 2 Image Creator V2.5.2
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where it ran
+      options: [RunPod pod, RunPod template, Verda, Mac (local), Other]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+      description: The steps, then what you saw. Paste the relevant log lines (never a key or a token).
+    validations:
+      required: true

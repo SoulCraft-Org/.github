@@ -1,0 +1,10 @@
+name: An idea
+description: Something a workflow or the base could do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would like, and what it is for
+    validations:
+      required: true

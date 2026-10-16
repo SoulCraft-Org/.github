@@ -1,0 +1,7 @@
+{
+  "name": "SoulCraft package gate",
+  "description": "verify.sh (zip matches tree, suite from the repository and from the zip) and the private cast guard, for a ComfyUI Base package.",
+  "iconName": "octicon shield-check",
+  "categories": ["Python"],
+  "filePatterns": ["-script\\.sh$"]
+}

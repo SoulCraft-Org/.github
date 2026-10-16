@@ -1,0 +1,7 @@
+# Keeps the reusable workflows' actions current; a bump is merged once a package's CI is green on it, then v1 moves.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

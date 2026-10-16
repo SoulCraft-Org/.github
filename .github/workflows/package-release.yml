@@ -1,0 +1,58 @@
+# A release for a version tag, called from a package's .github/workflows/release.yml on `push: tags: ["v*"]`:
+#
+#   jobs:
+#     release:
+#       uses: SoulCraft-Org/.github/.github/workflows/package-release.yml@main
+#       permissions:
+#         contents: write
+#       secrets: inherit
+#
+# The tag must be v<PKG_VERSION> from <name>-script.sh; the gate re-runs with the cast guard REQUIRED (a zip a stranger
+# downloads may carry no private test-cast name); then <name>-<host>.zip is attached to a GitHub release of that tag.
+name: package-release
+
+on:
+  workflow_call:
+    secrets:
+      CI_APP_ID:
+        required: false
+      CI_APP_KEY:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: the tag is v<PKG_VERSION>
+        run: |
+          name="${{ github.event.repository.name }}"
+          ver="$(sed -n 's/.*PKG_VERSION="\([^"]*\)".*/\1/p' "$name-script.sh" | head -1)"
+          [ "${GITHUB_REF_NAME}" = "v$ver" ] || { echo "::error::tag ${GITHUB_REF_NAME} is not v$ver (PKG_VERSION in $name-script.sh)"; exit 1; }
+
+  gate:
+    needs: tag
+    uses: SoulCraft-Org/.github/.github/workflows/package-ci.yml@main
+    with:
+      require-cast-guard: true
+    secrets: inherit
+
+  release:
+    needs: gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: GitHub release with the zip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          name="${{ github.event.repository.name }}"
+          zip="$(ls "$name"-*.zip | head -1)"
+          [ -f "$zip" ] || { echo "::error::no $name-<host>.zip in the tagged tree"; exit 1; }
+          title="$(sed -n '1s/^# //p' "$name-handbook.md")"
+          gh release create "$GITHUB_REF_NAME" "$zip" --title "${title:-$name $GITHUB_REF_NAME}" --generate-notes --verify-tag
