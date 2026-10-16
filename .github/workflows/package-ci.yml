@@ -129,3 +129,7 @@ jobs:
           fi
           host="$(python3 "$COMFY_BASE/_build/package.py" --host "$NAME")"
           python3 workspace/tools/cast/cast.py guard "$NAME/$NAME-$host.zip"
+
+  # Secrets anywhere in the package's history (gitleaks, shared by every repository in the organization).
+  gitleaks:
+    uses: SoulCraft-Org/.github/.github/workflows/gitleaks.yml@main
