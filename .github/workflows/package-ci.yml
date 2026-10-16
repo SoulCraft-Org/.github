@@ -103,6 +103,9 @@ jobs:
         run: bash "$COMFY_BASE/testbed.sh" --server
 
       - name: verify (zip, suite from the repo, suite from the zip)
+        # ComfyUI Base 3.16.0's verify.sh otherwise starts a second server of its own beside the 8199 one.
+        env:
+          VERIFY_SERVER: ${{ inputs.testbed && 'reuse' || 'none' }}
         run: bash "$COMFY_BASE/_build/verify.sh" "$NAME"
 
       - name: stop the testbed
