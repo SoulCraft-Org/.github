@@ -71,6 +71,13 @@ jobs:
         with:
           enable-cache: true
 
+      # The runner image leaves too little disk for the testbed (every pack, a torch venv) plus Chromium: the
+      # workspace's integration run 38860674317 reached 92 MB free and the server never came up. These toolchains are never used here.
+      - name: room on the runner (drop the image's unused toolchains)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h / | tail -1
+
       # The live App-view tier drives the real frontend through _build/appview.py, a uv script that pins its own
       # playwright; the browser build has to match that pin, so it is installed per pinned version (none: no-op).
       - name: Chromium for the App-view tier (each playwright version the package's _build pins)
