@@ -43,9 +43,11 @@ permissions:
 jobs:
   verify:
     # CI_RUNNER (organization variable, private repositories only): "hf" while GitHub-hosted minutes are out; the job then
-    # runs on SoulCraft-Org's self-hosted runner on a free Hugging Face Space (runner group hf-free, label soulcraft-hf;
-    # workspace ci/hf-runner/). Unset or "github": GitHub's ubuntu-24.04.
-    runs-on: ${{ vars.CI_RUNNER == 'hf' && 'soulcraft-hf' || 'ubuntu-24.04' }}
+    # runs on SoulCraft-Org's self-hosted runners (runner group hf-free). Unset or "github": GitHub's ubuntu-24.04.
+    # Self-hosted, CI_POOL picks which: "on" = label soulcraft-free, any free runner, the never-sleeping linux-arm64 one on
+    # Oracle Cloud included (this gate is proven on arm64; workspace ci/oracle-runner/); unset = label soulcraft-hf, the
+    # Hugging Face Spaces (x64, workspace ci/hf-runner/).
+    runs-on: ${{ vars.CI_RUNNER == 'hf' && (vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf') || 'ubuntu-24.04' }}
     timeout-minutes: 90
     env:
       NAME: ${{ github.event.repository.name }}
