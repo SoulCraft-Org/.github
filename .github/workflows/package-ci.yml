@@ -67,7 +67,7 @@ jobs:
           echo "BASE_WORKSPACE=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
 
       # base_test reaches pytest through `uv run --no-project --python <newest> --with pytest`
-      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
 
