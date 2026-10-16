@@ -1,0 +1,46 @@
+# Secret scanning that costs nothing: gitleaks over the WHOLE git history, failing on any finding (secret values are
+# redacted in the log). Every SoulCraft-Org repository calls it: the packages through package-ci.yml, the others from
+# their own gitleaks.yml; it also runs here on this repository's pushes and pull requests.
+#
+#   jobs:
+#     gitleaks:
+#       uses: SoulCraft-Org/.github/.github/workflows/gitleaks.yml@main
+#
+# A false positive goes in the repository's .gitleaksignore (one finding fingerprint per line, printed in the log).
+# gitleaks is its release tarball, checked against the SHA-256 the release publishes before it runs. Dependabot cannot
+# move it: on a new gitleaks release, set VERSION and SHA256 (the linux_x64 line of gitleaks_<VERSION>_checksums.txt at
+# https://github.com/gitleaks/gitleaks/releases) and the pre-commit rev in each repository's .pre-commit-config.yaml.
+name: gitleaks
+
+on:
+  workflow_call:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERSION: 8.30.1
+      SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0               # every commit, not just the tip
+          persist-credentials: false
+
+      - name: gitleaks ${{ env.VERSION }} (checksum verified)
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/gitleaks.tgz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v$VERSION/gitleaks_${VERSION}_linux_x64.tar.gz"
+          echo "$SHA256  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP" gitleaks
+
+      - name: no secret anywhere in the history
+        run: '"$RUNNER_TEMP/gitleaks" git --redact --verbose --exit-code 1 .'
