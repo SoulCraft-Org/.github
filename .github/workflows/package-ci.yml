@@ -42,10 +42,10 @@ permissions:
 
 jobs:
   verify:
-    # CI_RUNNER (organization variable, private repositories only): "cloud" while GitHub-hosted minutes are out; the gate
-    # then runs in a Claude Code cloud session instead (cloud-ci/ in this repository) and this job is skipped
-    if: vars.CI_RUNNER != 'cloud'
-    runs-on: ubuntu-24.04
+    # CI_RUNNER (organization variable, private repositories only): "hf" while GitHub-hosted minutes are out; the job then
+    # runs on SoulCraft-Org's self-hosted runner on a free Hugging Face Space (runner group hf-free, label soulcraft-hf;
+    # workspace ci/hf-runner/). Unset or "github": GitHub's ubuntu-24.04.
+    runs-on: ${{ vars.CI_RUNNER == 'hf' && 'soulcraft-hf' || 'ubuntu-24.04' }}
     timeout-minutes: 90
     env:
       NAME: ${{ github.event.repository.name }}
@@ -57,6 +57,7 @@ jobs:
       # workspace's integration run 38860674317 reached 92 MB free and the server never came up. These toolchains are never used here.
       # First, before checkout and setup-uv: image-creator-krea-2#2 ran out of disk twice before setup-uv (2026-10-16).
       - name: room on the runner (drop the image's unused toolchains)
+        if: runner.environment == 'github-hosted'
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
           df -h / | tail -1
@@ -72,6 +73,7 @@ jobs:
             ref="$(git ls-remote --tags --refs "https://github.com/$BASE_REPO" 'base-v*' | sed 's|.*refs/tags/||' | sort -V | tail -1)"
           fi
           [ -n "$ref" ] || { echo "::error::no base-v* tag found on $BASE_REPO"; exit 1; }
+          rm -rf ComfyUI-Base      # a self-hosted runner keeps the workspace between runs
           git clone -q --depth 1 --branch "$ref" "https://github.com/$BASE_REPO" ComfyUI-Base
           echo "ComfyUI Base $ref ($(cat ComfyUI-Base/VERSION))" >> "$GITHUB_STEP_SUMMARY"
           echo "COMFY_BASE=$GITHUB_WORKSPACE/ComfyUI-Base" >> "$GITHUB_ENV"
@@ -85,9 +87,11 @@ jobs:
       # The live App-view tier drives the real frontend through _build/appview.py, a uv script that pins its own
       # playwright; the browser build has to match that pin, so it is installed per pinned version (none: no-op).
       - name: Chromium for the App-view tier (each playwright version the package's _build pins)
+        env:
+          DEPS: ${{ runner.environment == 'github-hosted' && '--with-deps' || '' }}   # the HF runner's image has them (no sudo)
         run: |
           for v in $(grep -rhoE 'playwright==[0-9.]+' "$NAME/_build" 2>/dev/null | sort -u | cut -d= -f3); do
-            uvx --from "playwright==$v" playwright install --with-deps chromium
+            uvx --from "playwright==$v" playwright install $DEPS chromium
           done
 
       # The suites import what a pod has (torch, numpy, PIL, ComfyUI itself) and run their comfyui tier against a live
@@ -136,5 +140,4 @@ jobs:
 
   # Secrets anywhere in the package's history (gitleaks, shared by every repository in the organization).
   gitleaks:
-    if: vars.CI_RUNNER != 'cloud'
     uses: SoulCraft-Org/.github/.github/workflows/gitleaks.yml@main

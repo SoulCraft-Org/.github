@@ -11,7 +11,6 @@ default community health files and issue and pull-request templates from a publi
 | `.github/workflows/package-ci.yml` | The gate every workflow package calls from its `ci.yml`: zip matches tree, suite from the repository, suite from the extracted zip (ComfyUI Base's `verify.sh`), then the private cast guard |
 | `.github/workflows/package-release.yml` | Called on a `v<version>` tag: checks the tag against `PKG_VERSION`, re-runs the gate with the cast guard required, and attaches `<name>-runpod.zip` to a GitHub release |
 | `.github/workflows/gitleaks.yml` | Secret scanning for every repository: gitleaks over the whole history, failing on a finding. package-ci.yml calls it for the packages; the others call it from their own `gitleaks.yml` |
-| `cloud-ci/` | The private repositories' gates in a Claude Code cloud session while `CI_RUNNER` is `cloud` (GitHub-hosted minutes spent); see its README |
 | `workflow-templates/` | "New workflow" templates for a new package repository |
 
 The packages call the reusable workflows at `@main`: one maintainer, and a change here is a pull request whose own
@@ -24,4 +23,7 @@ pull request.
 
 Secrets the workflows read (organization secrets, set by `workspace/org/apply.sh`): `CI_APP_ID` and `CI_APP_KEY`, the
 read-only `soulcraft-ci` GitHub App that lets a package's CI read the private workspace's cast tool. The organization
-variable `COMFY_BASE_REPO` says where ComfyUI Base lives (default `SoulCraft-Org/ComfyUI-Base`).
+variable `COMFY_BASE_REPO` says where ComfyUI Base lives (default `SoulCraft-Org/ComfyUI-Base`), and `CI_RUNNER`
+(private repositories only) where the jobs run: `hf` is the organization's self-hosted runner on a free Hugging Face
+Space (label `soulcraft-hf`, runner group `hf-free`; SoulCraft-Org/workspace `ci/hf-runner/`), anything else GitHub's
+`ubuntu-24.04`.
