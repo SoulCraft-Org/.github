@@ -81,10 +81,12 @@ jobs:
           echo "COMFY_BASE=$GITHUB_WORKSPACE/ComfyUI-Base" >> "$GITHUB_ENV"
           echo "BASE_WORKSPACE=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
 
-      # base_test reaches pytest through `uv run --no-project --python <newest> --with pytest`
+      # base_test reaches pytest through `uv run --no-project --python <newest> --with pytest`. The Oracle runners keep
+      # their uv cache on disk between jobs (UV_CACHE_DIR, workspace ci/oracle-runner/): the GitHub cache would only
+      # download it again and upload it whole, so they skip it.
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
-          enable-cache: true
+          enable-cache: ${{ !startsWith(runner.name, 'soulcraft-oracle') }}
 
       # The live App-view tier drives the real frontend through _build/appview.py, a uv script that pins its own
       # playwright; the browser build has to match that pin, so it is installed per pinned version (none: no-op).
