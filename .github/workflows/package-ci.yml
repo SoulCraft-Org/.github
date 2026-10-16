@@ -108,8 +108,11 @@ jobs:
 
       - name: verify (zip, suite from the repo, suite from the zip)
         # ComfyUI Base 3.16.0's verify.sh otherwise starts a second server of its own beside the 8199 one.
+        # Error log row 106: VERIFY_SUITE=zip (base 3.17.1+) runs every test once: from the extracted zip, then from the repo only
+        # the ones that skipped there. Only for the six packages whose repo-only tests were audited; the others keep both passes.
         env:
           VERIFY_SERVER: ${{ inputs.testbed && 'reuse' || 'none' }}
+          VERIFY_SUITE: ${{ contains(fromJSON('["character-creator-krea-2","image-creator-krea-2","image-creator-flux-2-dev","photo-auditor","video-creator-minimax-h3","video-continuer-minimax-h3"]'), github.event.repository.name) && 'zip' || 'both' }}
         run: bash "$COMFY_BASE/_build/verify.sh" "$NAME"
 
       - name: stop the testbed
