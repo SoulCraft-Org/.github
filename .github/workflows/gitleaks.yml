@@ -24,6 +24,7 @@ permissions:
 
 jobs:
   gitleaks:
+    if: vars.CI_RUNNER != 'cloud'     # see package-ci.yml; public repositories never see the variable, so they always run
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:

@@ -42,6 +42,9 @@ permissions:
 
 jobs:
   verify:
+    # CI_RUNNER (organization variable, private repositories only): "cloud" while GitHub-hosted minutes are out; the gate
+    # then runs in a Claude Code cloud session instead (cloud-ci/ in this repository) and this job is skipped
+    if: vars.CI_RUNNER != 'cloud'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -133,4 +136,5 @@ jobs:
 
   # Secrets anywhere in the package's history (gitleaks, shared by every repository in the organization).
   gitleaks:
+    if: vars.CI_RUNNER != 'cloud'
     uses: SoulCraft-Org/.github/.github/workflows/gitleaks.yml@main
