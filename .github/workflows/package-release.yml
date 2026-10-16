@@ -51,6 +51,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set +e                  # any failure below (API, jq, git) leaves gated=false: the full gate runs, it is never skipped
           api(){ curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/$1"; }
           gated=false; why="no merged pull request has this commit as its merge"
           tree="$(git rev-parse "$GITHUB_SHA^{tree}")"
@@ -68,6 +69,7 @@ jobs:
               else why="cannot read check runs (the caller grants no checks: read)"; fi
             fi
           else why="cannot read the commit's pull requests (the caller grants no pull-requests: read)"; fi
+          [ "$gated" = true ] || gated=false
           echo "gated=$gated" >> "$GITHUB_OUTPUT"
           echo "gate: $( [ "$gated" = true ] && echo 'already passed' || echo 'runs here' ): $why" | tee -a "$GITHUB_STEP_SUMMARY"
 
