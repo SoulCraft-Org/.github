@@ -97,7 +97,7 @@ jobs:
       - name: soulcraft-ci token (reads the private workspace for the cast guard)
         id: app
         if: env.HAS_APP == 'true'
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.CI_APP_ID }}
           private-key: ${{ secrets.CI_APP_KEY }}
