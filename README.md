@@ -16,6 +16,10 @@ The packages call the reusable workflows at `@main`: one maintainer, and a chang
 check is the next package run. When a second consumer appears, tag `v1` and move the callers to it, so a breaking
 change ships as `v2` one package at a time.
 
+Every action these workflows use is pinned to a full commit SHA, with its version as a comment beside it
+(GitHub's guidance: a SHA is the only reference that cannot be moved). Dependabot moves the pins in one grouped weekly
+pull request.
+
 Secrets the workflows read (organization secrets, set by `workspace/org/apply.sh`): `CI_APP_ID` and `CI_APP_KEY`, the
 read-only `soulcraft-ci` GitHub App that lets a package's CI read the private workspace's cast tool. The organization
-variable `COMFY_BASE_REPO` says where ComfyUI Base lives (default `Soul-Craft/ComfyUI-Base`, its first home).
+variable `COMFY_BASE_REPO` says where ComfyUI Base lives (default `SoulCraft-Org/ComfyUI-Base`).

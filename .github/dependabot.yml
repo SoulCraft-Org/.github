@@ -1,7 +1,11 @@
-# Keeps the reusable workflows' actions current; a bump is merged once a package's CI is green on it, then v1 moves.
+# Keeps the reusable workflows' actions current, pinned to full commit SHAs (the version is the comment beside each).
+# All of them arrive together in one weekly pull request; it is merged once a package's CI is green on it.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
