@@ -24,8 +24,8 @@ permissions:
 
 jobs:
   gitleaks:
-    if: vars.CI_RUNNER != 'cloud'     # see package-ci.yml; public repositories never see the variable, so they always run
-    runs-on: ubuntu-24.04
+    # CI_RUNNER: see package-ci.yml (private repositories only; public ones never see it and stay on GitHub's runners)
+    runs-on: ${{ vars.CI_RUNNER == 'hf' && 'soulcraft-hf' || 'ubuntu-24.04' }}
     timeout-minutes: 15
     env:
       VERSION: 8.30.1
