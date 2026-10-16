@@ -46,11 +46,11 @@ jobs:
     timeout-minutes: 90
     env:
       NAME: ${{ github.event.repository.name }}
-      # where ComfyUI Base lives: the org variable once org/apply.sh has moved it, else its first home (GitHub redirects)
-      BASE_REPO: ${{ vars.COMFY_BASE_REPO || 'Soul-Craft/ComfyUI-Base' }}
+      # where ComfyUI Base lives: the org variable once org/apply.sh has moved it, else its home in this organization
+      BASE_REPO: ${{ vars.COMFY_BASE_REPO || 'SoulCraft-Org/ComfyUI-Base' }}
       HAS_APP: ${{ secrets.CI_APP_ID != '' && secrets.CI_APP_KEY != '' }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: ${{ github.event.repository.name }}
 
@@ -67,7 +67,7 @@ jobs:
           echo "BASE_WORKSPACE=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
 
       # base_test reaches pytest through `uv run --no-project --python <newest> --with pytest`
-      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
 
@@ -104,7 +104,7 @@ jobs:
       - name: soulcraft-ci token (reads the private workspace for the cast guard)
         id: app
         if: env.HAS_APP == 'true'
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ secrets.CI_APP_ID }}
           private-key: ${{ secrets.CI_APP_KEY }}
@@ -113,7 +113,7 @@ jobs:
 
       - name: the workspace's cast tool
         if: env.HAS_APP == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.repository_owner }}/workspace
           token: ${{ steps.app.outputs.token }}
