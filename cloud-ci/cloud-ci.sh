@@ -36,7 +36,8 @@ session_url(){
 }
 
 # ── the result on GitHub (the session's GitHub proxy adds the credential outside the VM; no token is read here) ──
-# A check run when the proxy's credential may create one (a GitHub App's), else a commit status with the same name.
+# A check run when the proxy's credential may create one (a GitHub App's), else a commit status with the same name, else a
+# deployment to an environment of that name (the proxy refused check runs and statuses on 2026-10-16).
 # GitHub's answer to a refused request goes to $STATE/report.err and into the DONE line.
 report_start(){ # <repo> <sha> <name>: prints check:<id> or status
   local url id; url="$(session_url)"
@@ -47,6 +48,10 @@ report_start(){ # <repo> <sha> <name>: prints check:<id> or status
   elif gh api -X POST "repos/$ORG/$1/statuses/$2" -f state=pending -f context="$3" ${url:+-f target_url="$url"} \
       -f description="running in a Claude Code cloud session" --silent 2>>"$STATE/report.err"; then
     echo status
+  elif id="$(gh api -X POST "repos/$ORG/$1/deployments" -f ref="$2" -f environment="$3" -F auto_merge=false \
+      -F 'required_contexts[]' -f description="running in a Claude Code cloud session" --jq .id 2>>"$STATE/report.err")" &&
+      gh api -X POST "repos/$ORG/$1/deployments/$id/statuses" -f state=in_progress ${url:+-f log_url="$url"} --silent 2>>"$STATE/report.err"; then
+    echo "deployment:$id"   # a ruleset's required_deployments rule names the environment "$3"
   else
     return 1
   fi
@@ -62,6 +67,9 @@ report_done(){ # <repo> <sha> <name> <mode> <conclusion> <log>
       -f "output[text]=\`\`\`
 $text
 \`\`\`" --silent 2>>"$STATE/report.err"
+  elif [ "${4%%:*}" = deployment ]; then
+    gh api -X POST "repos/$ORG/$1/deployments/${4#deployment:}/statuses" -f state="$5" ${url:+-f log_url="$url"} \
+      -f description="$title in a Claude Code cloud session ($(tail -n 1 "$STATE/summary" | cut -c1-80))" --silent 2>>"$STATE/report.err"
   else
     gh api -X POST "repos/$ORG/$1/statuses/$2" -f state="$5" -f context="$3" ${url:+-f target_url="$url"} \
       -f description="$title in a Claude Code cloud session ($(tail -n 1 "$STATE/summary" | cut -c1-80))" --silent 2>>"$STATE/report.err"
