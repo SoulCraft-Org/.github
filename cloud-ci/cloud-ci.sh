@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The SoulCraft-Org gates, run inside a Claude Code cloud session (a routine fired by a pull request) instead of on a
 # GitHub-hosted runner. Same steps as the GitHub workflows, same check names prefixed "cloud / ", reported as a check
-# run by the Claude GitHub App through the session's GitHub proxy (no token or secret is read or stored here).
+# run (or a commit status) through the session's GitHub proxy (no token or secret is read or stored here).
 #
 #   bash cloud-ci.sh start [<pr-number>]   from the pull request's checkout: start the gate, detached (it outlives the
 #                                          session's 10-minute command limit); with a PR number, check out its head first
@@ -35,23 +35,37 @@ session_url(){
   [ -n "$id" ] && echo "https://claude.ai/code/session_${id#cse_}" || echo ""
 }
 
-# ── the check run (GitHub proxy: the session's gh carries the Claude GitHub App's credential, never a token here) ──
-check_start(){ # <repo> <sha> <name>
-  local url; url="$(session_url)"
-  gh api -X POST "repos/$ORG/$1/check-runs" -f name="$3" -f head_sha="$2" -f status=in_progress \
-    ${url:+-f details_url="$url"} -f "output[title]=running in a Claude Code cloud session" \
-    -f "output[summary]=Started $(date -u +%FT%TZ). ${url:+Session: $url}" --jq .id
+# ── the result on GitHub (the session's GitHub proxy adds the credential outside the VM; no token is read here) ──
+# A check run when the proxy's credential may create one (a GitHub App's), else a commit status with the same name.
+# GitHub's answer to a refused request goes to $STATE/report.err and into the DONE line.
+report_start(){ # <repo> <sha> <name>: prints check:<id> or status
+  local url id; url="$(session_url)"
+  if id="$(gh api -X POST "repos/$ORG/$1/check-runs" -f name="$3" -f head_sha="$2" -f status=in_progress \
+      ${url:+-f details_url="$url"} -f "output[title]=running in a Claude Code cloud session" \
+      -f "output[summary]=Started $(date -u +%FT%TZ). ${url:+Session: $url}" --jq .id 2>>"$STATE/report.err")"; then
+    echo "check:$id"
+  elif gh api -X POST "repos/$ORG/$1/statuses/$2" -f state=pending -f context="$3" ${url:+-f target_url="$url"} \
+      -f description="running in a Claude Code cloud session" --silent 2>>"$STATE/report.err"; then
+    echo status
+  else
+    return 1
+  fi
 }
-check_done(){ # <repo> <check-id> <conclusion> <log>
-  local title text
-  [ "$3" = success ] && title="passed" || title="failed"
-  # the log's last lines, ANSI colours stripped, under GitHub's 65535-character limit for output.text
-  text="$(sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g' "$4" | tail -n 250 | tail -c 60000)"
-  gh api -X PATCH "repos/$ORG/$1/check-runs/$2" -f status=completed -f conclusion="$3" \
-    -f "output[title]=$title" -f "output[summary]=$(cat "$STATE/summary" 2>/dev/null)" \
-    -f "output[text]=\`\`\`
+report_done(){ # <repo> <sha> <name> <mode> <conclusion> <log>
+  local title text url; url="$(session_url)"
+  [ "$5" = success ] && title="passed" || title="failed"
+  if [ "${4%%:*}" = check ]; then
+    # the log's last lines, ANSI colours stripped, under GitHub's 65535-character limit for output.text
+    text="$(sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g' "$6" | tail -n 250 | tail -c 60000)"
+    gh api -X PATCH "repos/$ORG/$1/check-runs/${4#check:}" -f status=completed -f conclusion="$5" \
+      -f "output[title]=$title" -f "output[summary]=$(cat "$STATE/summary" 2>/dev/null)" \
+      -f "output[text]=\`\`\`
 $text
-\`\`\`" --silent
+\`\`\`" --silent 2>>"$STATE/report.err"
+  else
+    gh api -X POST "repos/$ORG/$1/statuses/$2" -f state="$5" -f context="$3" ${url:+-f target_url="$url"} \
+      -f description="$title in a Claude Code cloud session ($(tail -n 1 "$STATE/summary" | cut -c1-80))" --silent 2>>"$STATE/report.err"
+  fi
 }
 
 # ── the workspace: the repositories the routine attached, side by side, as bootstrap.sh would lay them out ──
@@ -111,21 +125,26 @@ gate(){ # <repo>: the same steps as that repository's GitHub workflow
   esac
 }
 
-run(){ # the detached part: check run in progress, the gate, check run completed
-  local name sha id rc conclusion
-  name="$(repo_name)"; sha="$(git rev-parse HEAD)"
+run(){ # the detached part: result pending on GitHub, the gate, result final on GitHub
+  local name sha mode rc conclusion check
+  name="$(repo_name)"; sha="$(git rev-parse HEAD)"; check="$(check_name "$name")"
   : > "$STATE/summary"
   echo "$ORG/$name @ ${sha:0:12}, $(nproc) CPUs, $(free -g | awk '/Mem:/{print $2}') GB" >> "$STATE/summary"
-  id="$(check_start "$name" "$sha" "$(check_name "$name")")" || { echo "DONE error (could not create the check run)" > "$STATE/done"; return; }
-  echo "$id" > "$STATE/check-id"
+  if ! mode="$(report_start "$name" "$sha" "$check")"; then
+    echo "DONE error (GitHub refused the result: $(tr '\n' ' ' < "$STATE/report.err" | cut -c1-300))" > "$STATE/done"; return
+  fi
+  echo "$mode" > "$STATE/mode"
   export COMFY_BASE BASE_WORKSPACE="$WS" WS
   timeout 5400 bash "$HERE/cloud-ci.sh" _gate "$name" >> "$STATE/log" 2>&1
   rc=$?
   [ $rc -eq 0 ] && conclusion=success || conclusion=failure
   [ $rc -eq 124 ] && echo "timed out after 90 minutes" >> "$STATE/summary"
   echo "exit $rc after $(( $(date +%s) - $(cat "$STATE/start") ))s" >> "$STATE/summary"
-  check_done "$name" "$id" "$conclusion" "$STATE/log" || conclusion="error (gate $conclusion, check run not updated)"
-  echo "DONE $conclusion" > "$STATE/done"
+  if report_done "$name" "$sha" "$check" "$mode" "$conclusion" "$STATE/log"; then
+    echo "DONE $conclusion ($check as a ${mode%%:*}, $(tail -n 1 "$STATE/summary"))" > "$STATE/done"
+  else
+    echo "DONE error (gate $conclusion; GitHub refused the result: $(tr '\n' ' ' < "$STATE/report.err" | cut -c1-300))" > "$STATE/done"
+  fi
 }
 
 case "${1:-}" in
