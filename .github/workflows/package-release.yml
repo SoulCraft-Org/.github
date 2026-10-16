@@ -24,7 +24,8 @@ permissions:
 
 jobs:
   tag:
-    runs-on: ubuntu-24.04
+    # CI_RUNNER: as in package-ci.yml ("hf" = the self-hosted runner on a free Hugging Face Space, label soulcraft-hf)
+    runs-on: ${{ vars.CI_RUNNER == 'hf' && 'soulcraft-hf' || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: the tag is v<PKG_VERSION>
@@ -42,7 +43,7 @@ jobs:
 
   release:
     needs: gate
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_RUNNER == 'hf' && 'soulcraft-hf' || 'ubuntu-24.04' }}
     permissions:
       contents: write
     steps:
