@@ -5,11 +5,11 @@
 #       uses: SoulCraft-Org/.github/.github/workflows/package-ci.yml@main
 #       secrets: inherit
 #
-# The same three steps a maintainer runs before a commit (ComfyUI Base's _build/verify.sh), then the cast guard:
+# ComfyUI Base's _build/verify.sh in its one-pass mode (VERIFY_SUITE=zip, base 3.16.1), then the cast guard:
 #   1. <name>-<host>.zip matches the working tree       (package.py --check)
-#   2. the suite, from the repository                  (<name>-script.sh test)
-#   3. the suite, from the EXTRACTED zip                (what a pod runs)
-#   4. no name from the private test cast in the zip    (workspace's tools/cast/cast.py guard)
+#   2. the suite, from the EXTRACTED zip                (what a pod runs)
+#   3. no name from the private test cast in the zip    (workspace's tools/cast/cast.py guard)
+# A maintainer's verify.sh also runs the suite from the repository; CI skips that second pass.
 # No GPU and no provisioned testbed here, so the comfyui/runpod/gpu tiers skip themselves by name.
 #
 # The layout is the base's workspace shape (py/pkgdirs.py, base 3.6.0): $GITHUB_WORKSPACE is the workspace, the package
@@ -102,10 +102,13 @@ jobs:
         if: inputs.testbed
         run: bash "$COMFY_BASE/testbed.sh" --server
 
-      - name: verify (zip, suite from the repo, suite from the zip)
+      - name: verify (zip, suite from the zip)
         # ComfyUI Base 3.16.0's verify.sh otherwise starts a second server of its own beside the 8199 one.
+        # Base 3.16.1: the suite runs once, from the extracted zip (what a pod runs), after the zip check. An older
+        # base ignores VERIFY_SUITE and runs both suites.
         env:
           VERIFY_SERVER: ${{ inputs.testbed && 'reuse' || 'none' }}
+          VERIFY_SUITE: zip
         run: bash "$COMFY_BASE/_build/verify.sh" "$NAME"
 
       - name: stop the testbed
