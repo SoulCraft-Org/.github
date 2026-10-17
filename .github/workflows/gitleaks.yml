@@ -51,5 +51,7 @@ jobs:
           echo "$sum  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP" gitleaks
 
+      # HEAD's whole history (on a pull request, the merge preview: main plus the PR's commits), not --all. The
+      # full-depth checkout fetches every branch, and an unscoped scan let one open PR's finding fail every other PR.
       - name: no secret anywhere in the history
-        run: '"$RUNNER_TEMP/gitleaks" git --redact --verbose --exit-code 1 .'
+        run: '"$RUNNER_TEMP/gitleaks" git --log-opts=HEAD --redact --verbose --exit-code 1 .'
