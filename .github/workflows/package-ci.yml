@@ -68,7 +68,43 @@ jobs:
         with:
           path: ${{ github.event.repository.name }}
 
+      # A pull request that changes only notes skips every step below: each changed file is Markdown, not the
+      # handbook (the zip ships it) or a README (suites read them), and named by no other file in the package (a
+      # suite that reads CLAUDE.md or HANDOFF.md names it; so does a ZIP_EXTRA row). The job still runs and passes,
+      # so the required check `verify / verify` reports success; a workflow-level `paths` filter would leave it
+      # pending forever. The filter is a step, not a job of its own, so a code change waits for a runner once.
+      # Releases, dispatches and anything unclear (the compare call fails, 300 files or more) run the whole gate.
+      - name: what this pull request changes (notes only skip the gate)
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          gate=run
+          if [ "$EVENT" = pull_request ] && files="$(gh api "repos/$GITHUB_REPOSITORY/compare/$BASE_SHA...$HEAD_SHA" \
+               --jq 'if (.files | length) < 300 then .files[] | .filename, (.previous_filename // empty) else error("300 files or more") end')" \
+             && [ -n "$files" ]; then
+            gate=skip
+            while IFS= read -r f; do
+              b="${f##*/}"
+              case "$b" in
+                "$NAME-handbook.md"|README.md) gate=run ;;
+                *.md) if git -C "$NAME" grep -qIF -e "$b" -- ':(exclude)*.md'; then gate=run; fi ;;
+                *) gate=run ;;
+              esac
+              if [ "$gate" = run ]; then echo "the gate runs: $f"; break; fi
+            done <<< "$files"
+          fi
+          echo "gate=$gate" >> "$GITHUB_OUTPUT"
+          if [ "$gate" = skip ]; then
+            echo "::notice::notes only (Markdown that nothing ships or reads): the gate is skipped, the check passes"
+            echo "Notes only: the gate was skipped." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: ComfyUI Base
+        if: steps.scope.outputs.gate == 'run'
         run: |
           ref="${{ inputs.base-ref }}"
           if [ -z "$ref" ]; then
@@ -85,12 +121,14 @@ jobs:
       # their uv cache on disk between jobs (UV_CACHE_DIR, workspace ci/oracle-runner/): the GitHub cache would only
       # download it again and upload it whole, so they skip it.
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        if: steps.scope.outputs.gate == 'run'
         with:
           enable-cache: ${{ !startsWith(runner.name, 'soulcraft-oracle') }}
 
       # The live App-view tier drives the real frontend through _build/appview.py, a uv script that pins its own
       # playwright; the browser build has to match that pin, so it is installed per pinned version (none: no-op).
       - name: Chromium for the App-view tier (each playwright version the package's _build pins)
+        if: steps.scope.outputs.gate == 'run'
         env:
           DEPS: ${{ runner.environment == 'github-hosted' && '--with-deps' || '' }}   # the HF runner's image has them (no sudo)
         run: |
@@ -103,10 +141,11 @@ jobs:
       # release, the base packs and THIS package's packs at HEAD, a CPU venv, the server on 8199. verify.sh finds it
       # beside the base (testbed/ and .testbed-server.port). Without it most suites fail on a missing torch or numpy.
       - name: the shared testbed (ComfyUI + this package's packs, CPU server)
-        if: inputs.testbed
+        if: steps.scope.outputs.gate == 'run' && inputs.testbed
         run: bash "$COMFY_BASE/testbed.sh" --server
 
       - name: verify (zip, suite from the repo, suite from the zip)
+        if: steps.scope.outputs.gate == 'run'
         # ComfyUI Base 3.16.0's verify.sh otherwise starts a second server of its own beside the 8199 one.
         # Error log row 106: VERIFY_SUITE=zip (base 3.17.1+) runs every test once: from the extracted zip, then from the repo only
         # the ones that skipped there. Only for the six packages whose repo-only tests were audited; the others keep both passes.
@@ -116,12 +155,12 @@ jobs:
         run: bash "$COMFY_BASE/_build/verify.sh" "$NAME"
 
       - name: stop the testbed
-        if: always() && inputs.testbed
+        if: always() && steps.scope.outputs.gate == 'run' && inputs.testbed
         run: bash "$COMFY_BASE/testbed.sh" --stop || true
 
       - name: soulcraft-ci token (reads the private workspace for the cast guard)
         id: app
-        if: env.HAS_APP == 'true'
+        if: steps.scope.outputs.gate == 'run' && env.HAS_APP == 'true'
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ secrets.CI_APP_ID }}
@@ -130,7 +169,7 @@ jobs:
           repositories: workspace
 
       - name: the workspace's cast tool
-        if: env.HAS_APP == 'true'
+        if: steps.scope.outputs.gate == 'run' && env.HAS_APP == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ github.repository_owner }}/workspace
@@ -139,6 +178,7 @@ jobs:
           sparse-checkout: tools/cast
 
       - name: cast guard (no private test-cast name in the zip)
+        if: steps.scope.outputs.gate == 'run'
         run: |
           if [ "$HAS_APP" != "true" ]; then
             msg="cast guard NOT run: the org secrets CI_APP_ID / CI_APP_KEY (the soulcraft-ci app) are not set"
