@@ -5,10 +5,17 @@
 #       uses: SoulCraft-Org/.github/.github/workflows/package-release.yml@main
 #       permissions:
 #         contents: write
+#         pull-requests: read     # to find the pull request the tag's commit came from
+#         checks: read            # to read that pull request's verify result
 #       secrets: inherit
 #
-# The tag must be v<PKG_VERSION> from <name>-script.sh; the gate re-runs with the cast guard REQUIRED (a zip a stranger
-# downloads may carry no private test-cast name); then <name>-<host>.zip is attached to a GitHub release of that tag.
+# The tag must be v<PKG_VERSION> from <name>-script.sh. Then the gate, ONCE: when the tag's commit is the merge of a pull
+# request whose head passed `verify / verify` with the same tree, that pass stands, and only what the pull request's
+# gate did not do runs here: the cast guard REQUIRED on the tagged zip (a zip a stranger downloads may carry no private
+# test-cast name), in seconds. Otherwise (no such pull request, another tree, a red or missing verify, or a caller that
+# grants no pull-requests/checks read) the full gate runs with the cast guard required, as before (error log row 112:
+# eight releases waited up to 2 h 15 min on the two free runners re-running gates that had already passed). Then
+# <name>-<host>.zip is attached to a GitHub release of that tag.
 name: package-release
 
 on:
@@ -26,6 +33,12 @@ jobs:
   tag:
     # CI_RUNNER: as in package-ci.yml ("hf" = the self-hosted runner on a free Hugging Face Space, label soulcraft-hf)
     runs-on: ${{ vars.CI_RUNNER == 'hf' && 'soulcraft-hf' || 'ubuntu-24.04' }}
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+    outputs:
+      gated: ${{ steps.gated.outputs.gated }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: the tag is v<PKG_VERSION>
@@ -33,16 +46,80 @@ jobs:
           name="${{ github.event.repository.name }}"
           ver="$(sed -n 's/.*PKG_VERSION="\([^"]*\)".*/\1/p' "$name-script.sh" | head -1)"
           [ "${GITHUB_REF_NAME}" = "v$ver" ] || { echo "::error::tag ${GITHUB_REF_NAME} is not v$ver (PKG_VERSION in $name-script.sh)"; exit 1; }
+      - name: did this exact tree already pass the gate in its pull request?
+        id: gated
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e                  # any failure below (API, jq, git) leaves gated=false: the full gate runs, it is never skipped
+          api(){ curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/$1"; }
+          gated=false; why="no merged pull request has this commit as its merge"
+          tree="$(git rev-parse "$GITHUB_SHA^{tree}")"
+          if prs="$(api "commits/$GITHUB_SHA/pulls")"; then
+            pr="$(jq -r --arg s "$GITHUB_SHA" '[.[] | select(.merge_commit_sha == $s)][0] // empty | "\(.number) \(.head.sha)"' <<< "$prs")"
+            if [ -n "$pr" ]; then
+              n="${pr% *}"; head="${pr#* }"
+              htree="$(api "git/commits/$head" | jq -r .tree.sha)" || htree=""
+              if [ "$htree" != "$tree" ]; then
+                why="#$n's head $head has another tree (main moved under it): its gate did not see this tree"
+              elif runs="$(api "commits/$head/check-runs?check_name=verify%20%2F%20verify&per_page=20")"; then
+                if jq -e '[.check_runs[] | select(.conclusion == "success")] | length > 0' <<< "$runs" > /dev/null; then
+                  gated=true; why="#$n's head $head passed verify / verify with this exact tree"
+                else why="#$n's head $head has no green verify / verify"; fi
+              else why="cannot read check runs (the caller grants no checks: read)"; fi
+            fi
+          else why="cannot read the commit's pull requests (the caller grants no pull-requests: read)"; fi
+          [ "$gated" = true ] || gated=false
+          echo "gated=$gated" >> "$GITHUB_OUTPUT"
+          echo "gate: $( [ "$gated" = true ] && echo 'already passed' || echo 'runs here' ): $why" | tee -a "$GITHUB_STEP_SUMMARY"
 
+  # the full gate, only when the pull request's gate cannot stand for this tree
   gate:
     needs: tag
+    if: needs.tag.outputs.gated != 'true'
     uses: SoulCraft-Org/.github/.github/workflows/package-ci.yml@main
     with:
       require-cast-guard: true
     secrets: inherit
 
+  # what the pull request's gate never did: the cast guard, required, on the zip that is about to be published
+  guard:
+    needs: tag
+    if: needs.tag.outputs.gated == 'true'
+    runs-on: ${{ vars.CI_RUNNER == 'hf' && 'soulcraft-hf' || 'ubuntu-24.04' }}
+    env:
+      NAME: ${{ github.event.repository.name }}
+      HAS_APP: ${{ secrets.CI_APP_ID != '' && secrets.CI_APP_KEY != '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: ${{ github.event.repository.name }}
+      - name: the cast guard is required for a release
+        run: '[ "$HAS_APP" = "true" ] || { echo "::error::cast guard NOT run: the org secrets CI_APP_ID / CI_APP_KEY are not set"; exit 1; }'
+      - name: soulcraft-ci token (reads the private workspace for the cast guard)
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: workspace
+      - name: the workspace's cast tool
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository_owner }}/workspace
+          token: ${{ steps.app.outputs.token }}
+          path: workspace
+          sparse-checkout: tools/cast
+      - name: cast guard (no private test-cast name in the tagged zip)
+        run: |
+          zip="$(ls "$NAME/$NAME"-*.zip | head -1)"
+          [ -f "$zip" ] || { echo "::error::no $NAME-<host>.zip in the tagged tree"; exit 1; }
+          python3 workspace/tools/cast/cast.py guard "$zip"
+
   release:
-    needs: gate
+    needs: [tag, gate, guard]
+    if: always() && needs.tag.result == 'success' && (needs.gate.result == 'success' || needs.guard.result == 'success')
     runs-on: ${{ vars.CI_RUNNER == 'hf' && 'soulcraft-hf' || 'ubuntu-24.04' }}
     permissions:
       contents: write
