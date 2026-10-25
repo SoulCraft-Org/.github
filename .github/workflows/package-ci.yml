@@ -249,11 +249,14 @@ jobs:
 
       # The live App-view tier drives the real frontend through _build/appview.py, a uv script that pins its own
       # playwright; the browser build has to match that pin, so it is installed per pinned version (none: no-op).
+      # --with-deps (Chromium's system libraries, through sudo apt) wherever sudo needs no password: GitHub's runners and
+      # the router's Blacksmith overflow, which registers as self-hosted (runner.environment said no there, and every
+      # App-view tier failed "Host system is missing dependencies", 2026-10-25). The HF runner's image has the libraries
+      # and no sudo.
       - name: Chromium for the App-view tier (each playwright version the package's _build pins)
         if: steps.scope.outputs.gate == 'run'
-        env:
-          DEPS: ${{ runner.environment == 'github-hosted' && '--with-deps' || '' }}   # the HF runner's image has them (no sudo)
         run: |
+          DEPS=; if sudo -n true 2>/dev/null; then DEPS=--with-deps; fi
           for v in $(grep -rhoE 'playwright==[0-9.]+' "$NAME/_build" 2>/dev/null | sort -u | cut -d= -f3); do
             uvx --from "playwright==$v" playwright install $DEPS chromium
           done
