@@ -2,9 +2,9 @@
 # Dependabot looks every weekday; all action bumps arrive together in one pull request, merged by hand once a package's
 # CI is green on it. No dependabot-automerge caller here: this repository requires no check, so auto-merge would merge
 # at once.
-# pre-commit: the gitleaks hook. Its pull request is the signal for the move gitleaks.yml describes, done by hand in
-# that same pull request: VERSION and both SHA-256s, then the pre-commit rev in every repository. The other
-# repositories do not watch pre-commit, so the hook and the CI's gitleaks never part.
+# pre-commit: the gitleaks hook's frozen rev. Not here: gitleaks' release in gitleaks.yml (VERSION and both SHA-256s),
+# a pin no ecosystem reads; gitleaks-release.yml moves it each morning, so it and every repository's hook (each
+# repository watches pre-commit too) move the same day.
 version: 2
 updates:
   - package-ecosystem: github-actions

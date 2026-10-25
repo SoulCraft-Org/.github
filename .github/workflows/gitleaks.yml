@@ -8,9 +8,10 @@
 #
 # A false positive goes in the repository's .gitleaksignore (one finding fingerprint per line, printed in the log).
 # gitleaks is its release tarball for the runner's architecture, checked against the SHA-256 the release publishes before
-# it runs. Dependabot cannot move it: on a new gitleaks release, set VERSION, SHA256_X64 and SHA256_ARM64 (the linux_x64
-# and linux_arm64 lines of gitleaks_<VERSION>_checksums.txt at https://github.com/gitleaks/gitleaks/releases) and the
-# pre-commit rev in each repository's .pre-commit-config.yaml.
+# it runs. Dependabot cannot move VERSION, SHA256_X64 and SHA256_ARM64; gitleaks-release.yml does, each morning: a new
+# release becomes a pull request with the linux_x64 and linux_arm64 lines of its gitleaks_<VERSION>_checksums.txt, which
+# merges itself once this workflow passes on it (here, both tarballs are checked). Each repository's pre-commit rev moves
+# the same day with its own Dependabot pre-commit pull request.
 name: gitleaks
 
 on:
@@ -50,6 +51,20 @@ jobs:
             "https://github.com/gitleaks/gitleaks/releases/download/v$VERSION/gitleaks_${VERSION}_linux_$arch.tar.gz"
           echo "$sum  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP" gitleaks
+
+      # This repository's own runs only (a caller's github.repository is the caller): the other architecture's tarball
+      # against its sum too, so a wrong SHA256_ARM64 fails gitleaks-release's pull request on GitHub's x64 runner here,
+      # never the arm64 jobs of every private repository after the merge.
+      - name: the other architecture's gitleaks ${{ env.VERSION }} (checksum verified)
+        if: github.repository == 'SoulCraft-Org/.github'
+        run: |
+          case "$RUNNER_ARCH" in
+            X64) arch=arm64; sum="$SHA256_ARM64" ;;
+            *)   arch=x64;   sum="$SHA256_X64" ;;
+          esac
+          curl -fsSL -o "$RUNNER_TEMP/other.tgz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v$VERSION/gitleaks_${VERSION}_linux_$arch.tar.gz"
+          echo "$sum  $RUNNER_TEMP/other.tgz" | sha256sum -c -
 
       # HEAD's whole history (on a pull request, the merge preview: main plus the PR's commits), not --all. The
       # full-depth checkout fetches every branch, and an unscoped scan let one open PR's finding fail every other PR.
