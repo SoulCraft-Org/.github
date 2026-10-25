@@ -1,0 +1,46 @@
+# Dependabot pull requests merge themselves (Paul, 2026-10-25): every one, majors included, once the repository's
+# required checks pass. This job only turns GitHub's auto-merge on; the org rulesets' required checks decide when the
+# merge happens, so a red run never merges. Each repository calls it from .github/workflows/dependabot-automerge.yml:
+#
+#   name: dependabot-automerge
+#   on: pull_request
+#   permissions: {}
+#   jobs:
+#     automerge:
+#       permissions:
+#         contents: write
+#         pull-requests: write
+#       uses: SoulCraft-Org/.github/.github/workflows/dependabot-automerge.yml@main
+#
+# Only in a repository whose ruleset requires a check: with none, auto-merge merges at once. This repository has no
+# caller for that reason. The merge is made with GITHUB_TOKEN (the soulcraft-ci app only reads), so it starts no push
+# workflow on main; the packages run their gate on the pull request, not on the merge, so nothing is skipped.
+name: dependabot-automerge
+
+on:
+  workflow_call:
+
+permissions: {}
+
+jobs:
+  automerge:
+    # Dependabot's pull request, and Dependabot's own event: a person's push to its branch does not qualify.
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.actor == 'dependabot[bot]'
+    # soulcraft-hf rather than the free pool: the job needs gh, which the hf-runner image carries (as for
+    # package-release.yml). Public repositories never see CI_RUNNER and stay on GitHub's runners.
+    runs-on: ${{ vars.CI_RUNNER == 'hf' && 'soulcraft-hf' || 'ubuntu-24.04' }}
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: turn on auto-merge (squash, the only method the rulesets allow)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.html_url }}
+        run: |
+          if [ "$(gh pr view "$PR" --json autoMergeRequest --jq '.autoMergeRequest != null')" = "true" ]; then
+            echo "auto-merge is already on for $PR"
+          else
+            gh pr merge --auto --squash "$PR"
+          fi
