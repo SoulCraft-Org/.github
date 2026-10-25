@@ -12,13 +12,16 @@
 #         pull-requests: write
 #       uses: SoulCraft-Org/.github/.github/workflows/dependabot-automerge.yml@main
 #
-# Only in a repository whose ruleset requires a check: with none, auto-merge merges at once. This repository has no
-# caller for that reason. The merge is made with GITHUB_TOKEN (the soulcraft-ci app only reads), so it starts no push
-# workflow on main; the packages run their gate on the pull request, not on the merge, so nothing is skipped.
+# Only in a repository whose ruleset requires a check: with none, auto-merge merges at once. This repository's caller
+# is this file (a caller here would need its path): it also runs on this repository's own pull requests, held by the
+# org ruleset "shared repos: CI gate (gitleaks)". The merge is made with GITHUB_TOKEN (not the soulcraft-ci app's), so
+# it starts no push workflow on main; the packages run their gate on the pull request, not on the merge, so nothing is
+# skipped.
 name: dependabot-automerge
 
 on:
   workflow_call:
+  pull_request:
 
 permissions: {}
 
