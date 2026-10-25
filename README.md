@@ -20,8 +20,8 @@ check is the next package run. When a second consumer appears, tag `v1` and move
 change ships as `v2` one package at a time.
 
 Every action these workflows use is pinned to a full commit SHA, with its version as a comment beside it
-(GitHub's guidance: a SHA is the only reference that cannot be moved). Dependabot moves the pins in one grouped weekly
-pull request.
+(GitHub's guidance: a SHA is the only reference that cannot be moved). Dependabot moves the pins in one grouped
+pull request each weekday, which merges itself once `gitleaks` passes here.
 
 Secrets the workflows read (organization secrets, set by `workspace/org/apply.sh`): `CI_APP_ID` and `CI_APP_KEY`, the
 `soulcraft-ci` GitHub App that lets a package's CI read the private workspace's cast tool, and opens
