@@ -12,6 +12,9 @@
 #   4. no name from the private test cast in the zip    (workspace's tools/cast/cast.py guard)
 # No GPU and no provisioned testbed here, so the comfyui/runpod/gpu tiers skip themselves by name.
 #
+# With the organization variable CI_ROUTER=on, a `route` job picks verify's runner first: a free slot, else overflow
+# minutes (README "The CI router").
+#
 # The layout is the base's workspace shape (py/pkgdirs.py, base 3.6.0): $GITHUB_WORKSPACE is the workspace, the package
 # is checked out at <workspace>/<name>, ComfyUI Base at <workspace>/ComfyUI-Base (a base checkout is never a package).
 name: package-ci
@@ -36,18 +39,137 @@ on:
         required: false
       CI_APP_KEY:
         required: false
+      ROUTER_APP_KEY:
+        required: false
 
 permissions:
   contents: read
 
 jobs:
+  # The router (README "The CI router"). GitHub has no fallback between runner labels (a job's labels are AND), so this
+  # job picks verify's runner before verify starts: a free self-hosted slot when one is idle; else, while
+  # CI_OVERFLOW_ENABLED is true, the first label in CI_OVERFLOW_LABELS that has used less than 90% of its free minutes
+  # this month; else the free pool anyway (verify waits for a slot, as before). Only with CI_ROUTER=on in a private
+  # repository (CI_RUNNER=hf); otherwise it is skipped and verify picks its runner exactly as before.
+  # It runs on its own light runner processes (label soulcraft-router), never GitHub-hosted: a hosted job is billed a
+  # whole minute. It reads and never writes: the runner list, and for the minute count GitHub's own job history (below).
+  # It never fails: no router token (the app not set up, a Dependabot run), an API error or unreadable data all route
+  # to the free pool. No concurrency group: GitHub scopes those to one repository, and a wrong guess between two routers
+  # costs one job a wait for a slot, never minutes.
+  route:
+    if: vars.CI_RUNNER == 'hf' && vars.CI_ROUTER == 'on'
+    runs-on: soulcraft-router
+    timeout-minutes: 5
+    outputs:
+      labels: ${{ steps.pick.outputs.labels }}
+      overflow: ${{ steps.pick.outputs.overflow }}
+    env:
+      HAS_KEY: ${{ vars.ROUTER_CLIENT_ID != '' && secrets.ROUTER_APP_KEY != '' }}
+    steps:
+      - name: router token (soulcraft-router app, read only)
+        id: app
+        if: env.HAS_KEY == 'true'
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.ROUTER_CLIENT_ID }}
+          private-key: ${{ secrets.ROUTER_APP_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-organization-self-hosted-runners: read
+          permission-actions: read
+
+      # Minutes used this month per overflow label, from the jobs GitHub ran: every job of this month's completed runs
+      # that called this workflow (the only one the router routes), counted by its labels, each rounded up to a whole
+      # minute as GitHub and Blacksmith bill it, re-runs included. Each run is read once and kept in a cache in the
+      # router process's tool folder (the job hooks keep _tool), so a router reads only the runs that finished since its
+      # last look; a fresh process catches up over a few routes (BUDGET runs each, read 8 at a time) and, until it has, routes
+      # nothing to overflow. Runs still in progress are not counted yet: the 10% headroom covers them.
+      - name: a free slot, or overflow
+        id: pick
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          POOL: ${{ vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf' }}
+          RESERVE: ${{ vars.CI_ROUTER_RESERVE }}
+          ENABLED: ${{ vars.CI_OVERFLOW_ENABLED }}
+          ORDER: ${{ vars.CI_OVERFLOW_LABELS }}
+          BUDGET: 1500
+        run: |
+          month="$(date -u +%Y-%m)"
+          [[ "$RESERVE" =~ ^[0-9]+$ ]] || RESERVE=0
+          api(){ curl -fsS --max-time 20 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "$GITHUB_API_URL/$1"; }
+          # the month's count: lines "<run id> <label> <minutes>" (label "-" for a run with no overflow job), one file per month
+          count(){
+            local cache todo r page runs
+            cache="${RUNNER_TOOL_CACHE:-$RUNNER_TEMP}/soulcraft-router/jobs-$month.txt"; todo="$RUNNER_TEMP/runs-to-read"
+            mkdir -p "${cache%/*}" && touch "$cache" && : > "$todo" || return 1
+            WANT="$(for e in $ORDER; do echo "${e%%=*}"; done | jq -R . | jq -sc .)"; export WANT
+            for r in $(api "installation/repositories?per_page=100" | jq -r '.repositories[] | select(.private) | .name') ; do
+              page=1
+              while :; do
+                runs="$(api "repos/$GITHUB_REPOSITORY_OWNER/$r/actions/runs?status=completed&created=%3E%3D$month-01&per_page=100&page=$page")" || return 1
+                jq -r --arg r "$r" '.workflow_runs[] | select(any(.referenced_workflows[]?; .path | contains("/package-ci.yml@"))) | "\($r) \(.id)"' <<< "$runs" \
+                  | while read -r repo id; do grep -q "^$id " "$cache" || echo "$repo $id"; done >> "$todo"
+                [ "$(jq '.workflow_runs | length' <<< "$runs")" -eq 100 ] || break
+                page=$((page + 1))
+              done
+            done
+            # the runs not read yet, 8 at a time; a run whose read fails is simply read again next time
+            head -n "$BUDGET" "$todo" | xargs -P 8 -n 2 bash -c 'curl -fsS --max-time 20 -H "Authorization: Bearer $GH_TOKEN" \
+                -H "Accept: application/vnd.github+json" "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY_OWNER/$0/actions/runs/$1/jobs?filter=all&per_page=100" \
+              | jq -r --arg id "$1" --argjson want "$WANT" "[.jobs[] | select(.started_at and .completed_at) | . as \$j | \$j.labels[] | select(IN(\$want[]))
+                  | \"\\(\$id) \\(.) \\(((\$j.completed_at | fromdateiso8601) - (\$j.started_at | fromdateiso8601) + 59) / 60 | floor)\"]
+                  | if length == 0 then \"\\(\$id) - 0\" else .[] end"' >> "$cache"
+            [ "$(wc -l < "$todo")" -le "$BUDGET" ] || return 2
+            echo "$cache"
+          }
+          labels="[\"$POOL\"]"; overflow=""
+          if [ -z "$GH_TOKEN" ]; then
+            why="no router token (ROUTER_CLIENT_ID / ROUTER_APP_KEY unset, the app's permissions not accepted, or a Dependabot run)"
+          elif ! runners="$(api "orgs/$GITHUB_REPOSITORY_OWNER/actions/runners?per_page=100")" \
+               || ! read -r online idle < <(jq -r --arg p "$POOL" \
+                 '[.runners[] | select(.status == "online" and any(.labels[]; .name == $p))] | "\(length) \(map(select(.busy | not)) | length)"' <<< "$runners") \
+               || ! [[ "$idle" =~ ^[0-9]+$ ]]; then
+            why="cannot read the organization's runners"
+          elif [ "$idle" -gt "$RESERVE" ]; then
+            why="$idle of $online online $POOL slots idle"
+          else
+            why="$idle of $online online $POOL slots idle (reserve $RESERVE)"
+            if [ "$ENABLED" != true ]; then
+              why="$why; overflow is off (CI_OVERFLOW_ENABLED=${ENABLED:-unset}): wait for a slot"
+            elif cache="$(count)"; then
+              for entry in $ORDER; do
+                label="${entry%%=*}"; cap="${entry#*=}"
+                [[ "$label" =~ ^[A-Za-z0-9._-]+$ && "$cap" =~ ^[0-9]+$ ]] || { echo "::warning::CI_OVERFLOW_LABELS: '$entry' is not <label>=<minutes>"; continue; }
+                u="$(awk -v l="$label" '$2 == l { s += $3 } END { print s + 0 }' "$cache")"
+                if [ $((u * 10)) -lt $((cap * 9)) ]; then
+                  labels="[\"$label\"]"; overflow="$label"
+                  why="$why; overflow to $label ($u of its $cap free minutes used in $month)"
+                  break
+                fi
+                why="$why; $label is at $u of $cap"
+              done
+              [ -n "$overflow" ] || why="$why; no overflow allowance under 90% this month: wait for a slot"
+            elif [ $? = 2 ]; then
+              why="$why; this month's minute count is still catching up ($BUDGET runs read this time): wait for a slot"
+            else
+              why="$why; cannot count this month's overflow minutes: wait for a slot"
+            fi
+          fi
+          echo "labels=$labels" >> "$GITHUB_OUTPUT"
+          echo "overflow=$overflow" >> "$GITHUB_OUTPUT"
+          [ -z "$overflow" ] || echo "::notice::verify overflows to $overflow"
+          echo "route: $labels: $why" | tee -a "$GITHUB_STEP_SUMMARY"
+
   verify:
-    # CI_RUNNER (organization variable, private repositories only): "hf" while GitHub-hosted minutes are out; the job then
-    # runs on SoulCraft-Org's self-hosted runners (runner group hf-free). Unset or "github": GitHub's ubuntu-24.04.
+    needs: route
+    if: ${{ !cancelled() }}         # also when route is skipped (CI_ROUTER unset)
+    # The router's pick when it ran. Otherwise CI_RUNNER (organization variable, private repositories only): "hf" while
+    # GitHub-hosted minutes are out; the job then runs on SoulCraft-Org's self-hosted runners (runner group hf-free).
+    # Unset or "github": GitHub's ubuntu-24.04.
     # Self-hosted, CI_POOL picks which: "on" = label soulcraft-free, any free runner, the never-sleeping linux-arm64 one on
     # Oracle Cloud included (this gate is proven on arm64; workspace ci/oracle-runner/); unset = label soulcraft-hf, the
     # Hugging Face Spaces (x64, workspace ci/hf-runner/).
-    runs-on: ${{ vars.CI_RUNNER == 'hf' && (vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf') || 'ubuntu-24.04' }}
+    runs-on: ${{ needs.route.outputs.labels && fromJSON(needs.route.outputs.labels) || (vars.CI_RUNNER == 'hf' && (vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf') || 'ubuntu-24.04') }}
     timeout-minutes: 90
     env:
       NAME: ${{ github.event.repository.name }}
