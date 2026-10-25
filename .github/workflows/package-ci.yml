@@ -12,6 +12,9 @@
 #   4. no name from the private test cast in the zip    (workspace's tools/cast/cast.py guard)
 # No GPU and no provisioned testbed here, so the comfyui/runpod/gpu tiers skip themselves by name.
 #
+# With the organization variable CI_ROUTER=on, a `route` job picks verify's runner first (a free slot, else overflow
+# minutes) and a `ledger` job counts the minutes of a verify that overflowed (README "The CI router").
+#
 # The layout is the base's workspace shape (py/pkgdirs.py, base 3.6.0): $GITHUB_WORKSPACE is the workspace, the package
 # is checked out at <workspace>/<name>, ComfyUI Base at <workspace>/ComfyUI-Base (a base checkout is never a package).
 name: package-ci
@@ -36,25 +39,124 @@ on:
         required: false
       CI_APP_KEY:
         required: false
+      ROUTER_APP_KEY:
+        required: false
 
 permissions:
   contents: read
 
 jobs:
+  # The router (README "The CI router"). GitHub has no fallback between runner labels (a job's labels are AND), so this
+  # job picks verify's runner before verify starts: a free self-hosted slot when one is idle; else, while
+  # CI_OVERFLOW_ENABLED is true, the first label in CI_OVERFLOW_LABELS that has used less than 90% of its free minutes
+  # this month; else the free pool anyway (verify waits for a slot, as before). Only with CI_ROUTER=on in a private
+  # repository (CI_RUNNER=hf); otherwise it is skipped and verify picks its runner exactly as before.
+  # It runs on its own light runner processes (label soulcraft-router), never GitHub-hosted: a hosted job is billed a
+  # whole minute. It never fails: no router token (the app not set up, a Dependabot run), an API error or unreadable data
+  # all route to the free pool. No concurrency group: GitHub scopes those to one repository, and a wrong guess between
+  # two routers costs one job a wait for a slot, never minutes.
+  route:
+    if: vars.CI_RUNNER == 'hf' && vars.CI_ROUTER == 'on'
+    runs-on: soulcraft-router
+    timeout-minutes: 5
+    outputs:
+      labels: ${{ steps.pick.outputs.labels }}
+      overflow: ${{ steps.pick.outputs.overflow }}
+    env:
+      HAS_KEY: ${{ vars.ROUTER_CLIENT_ID != '' && secrets.ROUTER_APP_KEY != '' }}
+    steps:
+      - name: router token (soulcraft-router app, narrowed to reading the organization's runners)
+        id: app
+        if: env.HAS_KEY == 'true'
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.ROUTER_CLIENT_ID }}
+          private-key: ${{ secrets.ROUTER_APP_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-organization-self-hosted-runners: read
+
+      - name: a free slot, or overflow
+        id: pick
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          POOL: ${{ vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf' }}
+          RESERVE: ${{ vars.CI_ROUTER_RESERVE }}
+          ENABLED: ${{ vars.CI_OVERFLOW_ENABLED }}
+          ORDER: ${{ vars.CI_OVERFLOW_LABELS }}
+          USED: ${{ vars.CI_OVERFLOW_USED }}
+        run: |
+          month="$(date -u +%Y-%m)"
+          [[ "$RESERVE" =~ ^[0-9]+$ ]] || RESERVE=0
+          # minutes the ledger (CI_OVERFLOW_USED, "<yyyy-mm> <label>=<minutes> ...") holds for label $1 this month
+          used(){ n="$(awk -v m="$month" -v l="$1" '$1 == m { for (i = 2; i <= NF; i++) { split($i, a, "="); if (a[1] == l) print a[2] + 0 } }' <<< "$USED")"; echo "${n:-0}"; }
+          case "$ENABLED" in
+            true) on=1 ;;
+            "full $month") on=0 ;;      # the ledger job turned it off: every allowance is 90% used this month
+            full\ *) on=1 ;;            # ... in an earlier month: the allowances are new
+            *) on=0 ;;
+          esac
+          labels="[\"$POOL\"]"; overflow=""
+          if [ -z "$GH_TOKEN" ]; then
+            why="no router token (ROUTER_CLIENT_ID / ROUTER_APP_KEY unset, the app's permission not accepted, or a Dependabot run)"
+          elif ! runners="$(curl -fsS --max-time 20 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+                 "$GITHUB_API_URL/orgs/$GITHUB_REPOSITORY_OWNER/actions/runners?per_page=100")" \
+               || ! read -r online idle < <(jq -r --arg p "$POOL" \
+                 '[.runners[] | select(.status == "online" and any(.labels[]; .name == $p))] | "\(length) \(map(select(.busy | not)) | length)"' <<< "$runners") \
+               || ! [[ "$idle" =~ ^[0-9]+$ ]]; then
+            why="cannot read the organization's runners"
+          elif [ "$idle" -gt "$RESERVE" ]; then
+            why="$idle of $online online $POOL slots idle"
+          else
+            why="$idle of $online online $POOL slots idle (reserve $RESERVE)"
+            if [ "$on" != 1 ]; then
+              why="$why; overflow is off (CI_OVERFLOW_ENABLED=${ENABLED:-unset}): wait for a slot"
+            else
+              for entry in $ORDER; do
+                label="${entry%%=*}"; cap="${entry#*=}"
+                [[ "$label" =~ ^[A-Za-z0-9._-]+$ && "$cap" =~ ^[0-9]+$ ]] || { echo "::warning::CI_OVERFLOW_LABELS: '$entry' is not <label>=<minutes>"; continue; }
+                u="$(used "$label")"
+                if [ $((u * 10)) -lt $((cap * 9)) ]; then
+                  labels="[\"$label\"]"; overflow="$label"
+                  why="$why; overflow to $label ($u of its $cap free minutes used in $month)"
+                  break
+                fi
+                why="$why; $label is at $u of $cap"
+              done
+              [ -n "$overflow" ] || why="$why; no overflow allowance under 90% this month: wait for a slot"
+            fi
+          fi
+          echo "labels=$labels" >> "$GITHUB_OUTPUT"
+          echo "overflow=$overflow" >> "$GITHUB_OUTPUT"
+          [ -z "$overflow" ] || echo "::notice::verify overflows to $overflow"
+          echo "route: $labels: $why" | tee -a "$GITHUB_STEP_SUMMARY"
+
   verify:
-    # CI_RUNNER (organization variable, private repositories only): "hf" while GitHub-hosted minutes are out; the job then
-    # runs on SoulCraft-Org's self-hosted runners (runner group hf-free). Unset or "github": GitHub's ubuntu-24.04.
+    needs: route
+    if: ${{ !cancelled() }}         # also when route is skipped (CI_ROUTER unset)
+    # The router's pick when it ran. Otherwise CI_RUNNER (organization variable, private repositories only): "hf" while
+    # GitHub-hosted minutes are out; the job then runs on SoulCraft-Org's self-hosted runners (runner group hf-free).
+    # Unset or "github": GitHub's ubuntu-24.04.
     # Self-hosted, CI_POOL picks which: "on" = label soulcraft-free, any free runner, the never-sleeping linux-arm64 one on
     # Oracle Cloud included (this gate is proven on arm64; workspace ci/oracle-runner/); unset = label soulcraft-hf, the
     # Hugging Face Spaces (x64, workspace ci/hf-runner/).
-    runs-on: ${{ vars.CI_RUNNER == 'hf' && (vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf') || 'ubuntu-24.04' }}
+    runs-on: ${{ needs.route.outputs.labels && fromJSON(needs.route.outputs.labels) || (vars.CI_RUNNER == 'hf' && (vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf') || 'ubuntu-24.04') }}
     timeout-minutes: 90
+    outputs:
+      started: ${{ steps.started.outputs.at }}
+      ended: ${{ steps.ended.outputs.at }}
     env:
       NAME: ${{ github.event.repository.name }}
       # where ComfyUI Base lives: the org variable once org/apply.sh has moved it, else its home in this organization
       BASE_REPO: ${{ vars.COMFY_BASE_REPO || 'SoulCraft-Org/ComfyUI-Base' }}
       HAS_APP: ${{ secrets.CI_APP_ID != '' && secrets.CI_APP_KEY != '' }}
     steps:
+      # On overflow, the job's first and last steps time it for the ledger job's minute count.
+      - name: overflow clock (start)
+        id: started
+        if: needs.route.outputs.overflow != ''
+        run: echo "at=$(date +%s)" >> "$GITHUB_OUTPUT"
+
       # The runner image leaves too little disk for the testbed (every pack, a torch venv) plus Chromium: the
       # workspace's integration run 38860674317 reached 92 MB free and the server never came up. These toolchains are never used here.
       # First, before checkout and setup-uv: image-creator-krea-2#2 ran out of disk twice before setup-uv (2026-10-16).
@@ -187,6 +289,85 @@ jobs:
           fi
           host="$(python3 "$COMFY_BASE/_build/package.py" --host "$NAME")"
           python3 workspace/tools/cast/cast.py guard "$NAME/$NAME-$host.zip"
+
+      - name: overflow clock (end)
+        id: ended
+        if: always() && needs.route.outputs.overflow != ''
+        run: echo "at=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+  # The minute counter, after a verify the router sent to overflow (a separate job on the router's processes, so the
+  # app key never meets the gate's third-party code). It adds verify's minutes to CI_OVERFLOW_USED: its clock plus 30
+  # seconds for the setup and cleanup outside it, rounded up (GitHub and Blacksmith bill each job in whole minutes).
+  # Once every label in CI_OVERFLOW_LABELS has used 90% of its month, it sets CI_OVERFLOW_ENABLED to "full <yyyy-mm>",
+  # which the router reads as off until the month ends. Two ledgers finishing together can overwrite each other's count
+  # (a variable has no compare-and-set): the 10% headroom covers it.
+  ledger:
+    needs: [route, verify]
+    if: always() && needs.route.outputs.overflow != ''
+    runs-on: soulcraft-router
+    timeout-minutes: 5
+    env:
+      HAS_KEY: ${{ vars.ROUTER_CLIENT_ID != '' && secrets.ROUTER_APP_KEY != '' }}
+    steps:
+      - name: router token (soulcraft-router app, for the organization's variables)
+        id: app
+        if: env.HAS_KEY == 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.ROUTER_CLIENT_ID }}
+          private-key: ${{ secrets.ROUTER_APP_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: count verify's overflow minutes
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          LABEL: ${{ needs.route.outputs.overflow }}
+          STARTED: ${{ needs.verify.outputs.started }}
+          ENDED: ${{ needs.verify.outputs.ended }}
+          ORDER: ${{ vars.CI_OVERFLOW_LABELS }}
+          ENABLED: ${{ vars.CI_OVERFLOW_ENABLED }}
+        run: |
+          [ -n "$STARTED" ] || { echo "verify never started on $LABEL: nothing to count"; exit 0; }
+          [ -n "$GH_TOKEN" ] || { echo "::error::no router token: $LABEL's minutes are not counted"; exit 1; }
+          min=$(( (${ENDED:-$(date +%s)} - STARTED + 30 + 59) / 60 ))
+          month="$(date -u +%Y-%m)"
+          url="$GITHUB_API_URL/orgs/$GITHUB_REPOSITORY_OWNER/actions/variables"
+          api(){ curl -sS --max-time 20 -o "$RUNNER_TEMP/var.json" -w '%{http_code}' -H "Authorization: Bearer $GH_TOKEN" \
+                   -H "Accept: application/vnd.github+json" "$@"; }
+          # read it now, not vars.CI_OVERFLOW_USED: that is this run's start, and other runs have counted since
+          code="$(api "$url/CI_OVERFLOW_USED")"
+          case "$code" in
+            200) cur="$(jq -r .value "$RUNNER_TEMP/var.json")" ;;
+            404) cur="" ;;
+            *) echo "::error::reading CI_OVERFLOW_USED: HTTP $code"; exit 1 ;;
+          esac
+          new="$(awk -v m="$month" -v l="$LABEL" -v n="$min" 'NR == 1 {
+                   if ($1 != m) $0 = m
+                   for (i = 2; i <= NF; i++) { split($i, a, "="); if (a[1] == l) { $i = l "=" (a[2] + n); n = 0 } }
+                   if (n) $0 = $0 " " l "=" n
+                   print }' <<< "$cur")"
+          if [ "$code" = 200 ]; then
+            code="$(api -X PATCH "$url/CI_OVERFLOW_USED" -d "$(jq -n --arg v "$new" '{value: $v}')")"
+          else
+            code="$(api -X POST "$url" -d "$(jq -n --arg v "$new" '{name: "CI_OVERFLOW_USED", value: $v, visibility: "private"}')")"
+          fi
+          [[ "$code" == 20[14] ]] || { echo "::error::writing CI_OVERFLOW_USED: HTTP $code"; exit 1; }
+          echo "ledger: +$min min on $LABEL; CI_OVERFLOW_USED is now '$new'" | tee -a "$GITHUB_STEP_SUMMARY"
+
+          # every allowance at 90% this month: overflow off until the month ends (only over "true": a person's off stays)
+          full=0
+          for entry in $ORDER; do
+            label="${entry%%=*}"; cap="${entry#*=}"
+            [[ "$cap" =~ ^[0-9]+$ ]] || continue
+            u="$(awk -v l="$label" '{ for (i = 2; i <= NF; i++) { split($i, a, "="); if (a[1] == l) print a[2] + 0 } }' <<< "$new")"
+            if [ $((${u:-0} * 10)) -lt $((cap * 9)) ]; then full=0; break; fi
+            full=1
+          done
+          if [ "$full" = 1 ] && [ "$ENABLED" = true ]; then
+            code="$(api -X PATCH "$url/CI_OVERFLOW_ENABLED" -d "$(jq -n --arg v "full $month" '{value: $v}')")"
+            [[ "$code" == 204 ]] || { echo "::error::setting CI_OVERFLOW_ENABLED: HTTP $code"; exit 1; }
+            echo "::notice::every overflow allowance is 90% used: CI_OVERFLOW_ENABLED is 'full $month' until the month ends" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
 
   # Secrets anywhere in the package's history (gitleaks, shared by every repository in the organization).
   gitleaks:
