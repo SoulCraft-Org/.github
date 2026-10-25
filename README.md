@@ -50,8 +50,8 @@ minutes used in 2026-10)`).
 **The minute count is GitHub's own job history**, not a counter anyone writes: every job of this month's completed runs
 that called `package-ci.yml`, summed per overflow label, each rounded up to a whole minute (how GitHub and Blacksmith
 bill), re-runs included. Each run is read once and cached in the router process's tool folder, so a router reads only
-the runs that finished since its last look; a freshly started router process catches up over a few routes (400 runs
-each) and sends nothing to overflow until it has. Runs still in progress are not counted yet; the 10% headroom covers
+the runs that finished since its last look; a freshly started router process reads up to 1,500 runs per route, 8 at a
+time (October 2026's whole month took 94 seconds), and sends nothing to overflow until it has. Runs still in progress are not counted yet; the 10% headroom covers
 them. The count only sees routed workflows: GitHub's minutes are shared with every GitHub-hosted job of the private
 repositories (Dependabot's included), so in a month whose minutes are already spent elsewhere, lower that label's
 number in `CI_OVERFLOW_LABELS` or leave it out (October 2026: the private repositories used 3,179 hosted minutes by the
