@@ -1,0 +1,96 @@
+# gitleaks' release in gitleaks.yml (VERSION, SHA256_X64, SHA256_ARM64) is a pin no Dependabot ecosystem reads. Each
+# morning a newer release becomes a pull request that moves it, and this repository's pre-commit hook unless Dependabot
+# moved it first, and merges itself once `gitleaks` passes (owner, 2026-10-25: every update merges once CI passes).
+# That check is the pull request's own gitleaks.yml: it downloads the new tarballs, both architectures here, and checks
+# them against the new sums, so a wrong sum never merges (org ruleset "shared repos: CI gate (gitleaks)"). The other
+# repositories' hooks move the same day with their own Dependabot pre-commit pull requests.
+#
+# The pull request comes from the soulcraft-ci app, so its checks run: one opened with GITHUB_TOKEN starts no workflow,
+# and this organization does not let Actions open pull requests. The app needs Contents, Pull requests and Workflows
+# write on this repository (Workflows because the change is to a workflow file), and CI_APP_ID and CI_APP_KEY must
+# reach this repository; without them the token step fails on the day a release appears, and the red run is the
+# reminder. Modelled on SoulCraft-Org/workspace's runner-release.yml.
+name: gitleaks-release
+
+on:
+  schedule:
+    - cron: "17 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitleaks-release
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    # A public repository: GitHub's runners cost nothing here.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: every pin to the newest release (nothing when it is current)
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -I .github/scripts/gitleaks_release.py --write >> "$GITHUB_OUTPUT"
+
+      - name: already proposed?
+        id: branch
+        if: steps.release.outputs.newest != steps.release.outputs.pinned
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: deps/gitleaks-${{ steps.release.outputs.newest }}
+        run: |
+          if gh api "repos/$GITHUB_REPOSITORY/branches/$BRANCH" --silent 2>/dev/null; then
+            echo "::notice::$BRANCH exists: its pull request is open (or the branch was left behind)"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # No owner or repositories: the token reaches this repository only.
+      - name: soulcraft-ci token (this repository's contents, pull requests and workflow files)
+        id: app
+        if: steps.branch.outputs.new == 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
+      - name: the pull request (squash auto-merge; the ruleset holds it until `gitleaks` passes)
+        if: steps.branch.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP: ${{ steps.app.outputs.app-slug }}
+          OLD: ${{ steps.release.outputs.pinned }}
+          NEW: ${{ steps.release.outputs.newest }}
+          BRANCH: deps/gitleaks-${{ steps.release.outputs.newest }}
+        run: |
+          gh auth setup-git
+          id=$(gh api "users/${APP}%5Bbot%5D" --jq .id)
+          git switch -c "$BRANCH"
+          git diff --name-only -z | xargs -0 git add --
+          git -c user.name="${APP}[bot]" -c user.email="${id}+${APP}[bot]@users.noreply.github.com" commit -q \
+            -m "ci: gitleaks $OLD -> $NEW" \
+            -m "VERSION and both SHA-256s in gitleaks.yml, from the release's checksums.txt (matched against GitHub's asset digests). Opened by gitleaks-release.yml."
+          git push -q origin "$BRANCH"
+          url=$(gh pr create --head "$BRANCH" --title "ci: gitleaks $OLD -> $NEW" --body "$(cat <<EOF
+          gitleaks [v$NEW](https://github.com/gitleaks/gitleaks/releases/tag/v$NEW) is out. \`.github/scripts/gitleaks_release.py --write\` moved the pins from $OLD: VERSION, and SHA256_X64 and SHA256_ARM64 from the linux_x64 and linux_arm64 lines of \`gitleaks_${NEW}_checksums.txt\`, each matched against the digest GitHub publishes for the asset:
+
+          $(git diff --stat HEAD~1 | sed 's/^/    /')
+
+          It merges itself once \`gitleaks\` passes: that run is this pull request's own gitleaks.yml, which downloads both new tarballs, checks them against these sums, then scans the history with the new release. Every repository's CI takes it from main at its next run; their pre-commit hooks move with their own Dependabot pull requests.
+
+          Opened by \`.github/workflows/gitleaks-release.yml\`.
+          EOF
+          )")
+          gh pr merge --auto --squash "$url"
+          echo "::notice::$url"
