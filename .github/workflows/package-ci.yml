@@ -283,7 +283,16 @@ jobs:
         if: always() && steps.scope.outputs.gate == 'run' && inputs.testbed
         run: bash "$COMFY_BASE/testbed.sh" --stop || true
 
-      - name: soulcraft-ci token (reads the private workspace for the cast guard)
+      - name: the meta repo (org variable META_REPO, owner/name; the app token wants the bare name)
+        id: meta
+        if: steps.scope.outputs.gate == 'run' && env.HAS_APP == 'true'
+        env:
+          META_REPO: ${{ vars.META_REPO || 'SoulCraft-Org/workspace' }}
+        run: |
+          echo "repo=$META_REPO" >> "$GITHUB_OUTPUT"
+          echo "name=${META_REPO#*/}" >> "$GITHUB_OUTPUT"
+
+      - name: soulcraft-ci token (reads the private meta repo for the cast guard)
         id: app
         if: steps.scope.outputs.gate == 'run' && env.HAS_APP == 'true'
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
@@ -291,13 +300,13 @@ jobs:
           app-id: ${{ secrets.CI_APP_ID }}
           private-key: ${{ secrets.CI_APP_KEY }}
           owner: ${{ github.repository_owner }}
-          repositories: workspace
+          repositories: ${{ steps.meta.outputs.name }}
 
-      - name: the workspace's cast tool
+      - name: the meta repo's cast tool
         if: steps.scope.outputs.gate == 'run' && env.HAS_APP == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: ${{ github.repository_owner }}/workspace
+          repository: ${{ steps.meta.outputs.repo }}
           token: ${{ steps.app.outputs.token }}
           path: workspace
           sparse-checkout: tools/cast
