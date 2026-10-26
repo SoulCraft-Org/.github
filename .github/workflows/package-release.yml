@@ -31,8 +31,9 @@ permissions:
 
 jobs:
   tag:
-    # CI_RUNNER: as in package-ci.yml ("hf" = the self-hosted runner on a free Hugging Face Space, label soulcraft-hf)
-    runs-on: ${{ vars.CI_RUNNER == 'hf' && 'soulcraft-hf' || 'ubuntu-24.04' }}
+    # As in package-ci.yml: a private repository always runs on the self-hosted runner (label soulcraft-hf), whatever
+    # CI_RUNNER says; a public one stays on GitHub's runners.
+    runs-on: ${{ github.event.repository.private && 'soulcraft-hf' || 'ubuntu-24.04' }}
     permissions:
       contents: read
       pull-requests: read
@@ -86,7 +87,7 @@ jobs:
   guard:
     needs: tag
     if: needs.tag.outputs.gated == 'true'
-    runs-on: ${{ vars.CI_RUNNER == 'hf' && 'soulcraft-hf' || 'ubuntu-24.04' }}
+    runs-on: ${{ github.event.repository.private && 'soulcraft-hf' || 'ubuntu-24.04' }}
     env:
       NAME: ${{ github.event.repository.name }}
       HAS_APP: ${{ secrets.CI_APP_ID != '' && secrets.CI_APP_KEY != '' }}
@@ -120,7 +121,7 @@ jobs:
   release:
     needs: [tag, gate, guard]
     if: always() && needs.tag.result == 'success' && (needs.gate.result == 'success' || needs.guard.result == 'success')
-    runs-on: ${{ vars.CI_RUNNER == 'hf' && 'soulcraft-hf' || 'ubuntu-24.04' }}
+    runs-on: ${{ github.event.repository.private && 'soulcraft-hf' || 'ubuntu-24.04' }}
     permissions:
       contents: write
     steps:

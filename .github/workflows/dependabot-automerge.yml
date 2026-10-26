@@ -30,8 +30,9 @@ jobs:
     # Dependabot's pull request, and Dependabot's own event: a person's push to its branch does not qualify.
     if: github.event.pull_request.user.login == 'dependabot[bot]' && github.actor == 'dependabot[bot]'
     # soulcraft-hf rather than the free pool: the job needs gh, which the hf-runner image carries (as for
-    # package-release.yml). Public repositories never see CI_RUNNER and stay on GitHub's runners.
-    runs-on: ${{ vars.CI_RUNNER == 'hf' && 'soulcraft-hf' || 'ubuntu-24.04' }}
+    # package-release.yml). A private repository always runs here, whatever CI_RUNNER says; a public one stays on
+    # GitHub's runners, which cost it nothing.
+    runs-on: ${{ github.event.repository.private && 'soulcraft-hf' || 'ubuntu-24.04' }}
     timeout-minutes: 5
     permissions:
       contents: write

@@ -26,9 +26,11 @@ permissions:
 
 jobs:
   gitleaks:
-    # CI_RUNNER and CI_POOL: see package-ci.yml (private repositories only; public ones never see them and stay on
-    # GitHub's runners). Proven on linux-arm64 and x64 alike (gitleaks 8.30.1, both tarballs, 2026-10-16).
-    runs-on: ${{ vars.CI_RUNNER == 'hf' && (vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf') || 'ubuntu-24.04' }}
+    # A private repository always runs on the self-hosted pool, whatever CI_RUNNER says (a hosted fallback would spend
+    # the organization's minutes); CI_POOL picks the label, see package-ci.yml. A public repository stays on GitHub's
+    # runners, which cost it nothing (the self-hosted runner group refuses public repositories). Proven on linux-arm64 and
+    # x64 alike (gitleaks 8.30.1, both tarballs, 2026-10-16).
+    runs-on: ${{ github.event.repository.private && (vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf') || 'ubuntu-24.04' }}
     timeout-minutes: 15
     env:
       VERSION: 8.30.1
