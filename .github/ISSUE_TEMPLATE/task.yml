@@ -1,0 +1,25 @@
+name: A task
+description: Planned work with a clear finish line
+type: Task
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What, and what it is for
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: The checks that say it is finished, one per line
+      placeholder: "- The two-person job finishes with both people swapped\n- CI is green"
+    validations:
+      required: true
+  - type: textarea
+    id: where
+    attributes:
+      label: Files or areas
+      description: Where the work happens, if known
+    validations:
+      required: false

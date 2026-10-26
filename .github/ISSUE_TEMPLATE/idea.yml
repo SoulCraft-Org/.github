@@ -1,6 +1,7 @@
 name: An idea
 description: Something a workflow or the base could do
 labels: [enhancement]
+type: Feature
 body:
   - type: textarea
     id: idea
@@ -8,3 +9,10 @@ body:
       label: What you would like, and what it is for
     validations:
       required: true
+  - type: dropdown
+    id: improves
+    attributes:
+      label: What it improves
+      options: [Output quality, Render speed, Install speed, The app (what a person sees), Docs, Other]
+    validations:
+      required: false

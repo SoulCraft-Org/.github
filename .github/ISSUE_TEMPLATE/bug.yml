@@ -1,6 +1,7 @@
 name: Something does not work
 description: A workflow, the base or a tool did something it should not, or failed
 labels: [bug]
+type: Bug
 body:
   - type: input
     id: version
@@ -14,7 +15,7 @@ body:
     id: where
     attributes:
       label: Where it ran
-      options: [RunPod pod, RunPod template, Verda, Mac (local), Other]
+      options: [RunPod pod, RunPod template, Verda, Comfy Cloud, CI (GitHub Actions), Mac (local), Other]
     validations:
       required: true
   - type: textarea
