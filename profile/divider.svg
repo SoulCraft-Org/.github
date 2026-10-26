@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 48" width="1600" height="48" role="img" aria-label="">
+  <style>
+    .tw { animation: tw 3.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+    @keyframes tw { 0%, 100% { opacity: .35; transform: scale(.8) } 50% { opacity: 1; transform: scale(1.15) } }
+    @media (prefers-reduced-motion: reduce) { .tw { animation: none } }
+  </style>
+  <defs>
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#E8C25A" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#E8C25A" stop-opacity=".85"/>
+      <stop offset="100%" stop-color="#E8C25A" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="160" y="23.5" width="1280" height="1.2" fill="url(#line)"/>
+  <g transform="translate(800 24) scale(2.2)"><path class="tw" d="M0,-9 Q1.4,-1.4 9,0 Q1.4,1.4 0,9 Q-1.4,1.4 -9,0 Q-1.4,-1.4 0,-9 Z" fill="#E8C25A"/></g>
+  <g transform="translate(738 24) scale(1.15)"><path class="tw" style="animation-delay:-1.2s" d="M0,-9 Q1.4,-1.4 9,0 Q1.4,1.4 0,9 Q-1.4,1.4 -9,0 Q-1.4,-1.4 0,-9 Z" fill="#8B6CE0"/></g>
+  <g transform="translate(862 24) scale(1.15)"><path class="tw" style="animation-delay:-2.4s" d="M0,-9 Q1.4,-1.4 9,0 Q1.4,1.4 0,9 Q-1.4,1.4 -9,0 Q-1.4,-1.4 0,-9 Z" fill="#8B6CE0"/></g>
+</svg>
