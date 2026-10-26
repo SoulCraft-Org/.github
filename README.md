@@ -7,7 +7,7 @@ default community health files and issue and pull-request templates from a publi
 |---|---|
 | `profile/README.md` | The organization's public profile page |
 | `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `SUPPORT.md` | Defaults for every repository that has none of its own |
-| `.github/ISSUE_TEMPLATE/`, `.github/pull_request_template.md` | The default issue forms and pull-request template |
+| `.github/ISSUE_TEMPLATE/`, `.github/pull_request_template.md` | The default issue forms (bug, idea, task; each sets the organization's issue type Bug, Feature or Task) and the pull-request template (its `Fixes #` line closes the issue on merge). A repository with its own `ISSUE_TEMPLATE/` gets none of these |
 | `.github/workflows/package-ci.yml` | The gate every workflow package calls from its `ci.yml`: zip matches tree, suite from the repository, suite from the extracted zip (ComfyUI Base's `verify.sh`), then the private cast guard |
 | `.github/workflows/package-release.yml` | Called on a `v<version>` tag: checks the tag against `PKG_VERSION`, re-runs the gate with the cast guard required, and attaches `<name>-runpod.zip` to a GitHub release |
 | `.github/workflows/package-gpu.yml` | By hand (`workflow_dispatch` in a package's `gpu.yml`): the suite's pod-only tiers (`runpod`, `gpu`) on the pod itself, which is a free ephemeral self-hosted runner labelled `gpu-pod` while it is up (ComfyUI Base `podctl runner <pod>`). It installs and restarts nothing |
