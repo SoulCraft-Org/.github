@@ -97,18 +97,25 @@ jobs:
           path: ${{ github.event.repository.name }}
       - name: the cast guard is required for a release
         run: '[ "$HAS_APP" = "true" ] || { echo "::error::cast guard NOT run: the org secrets CI_APP_ID / CI_APP_KEY are not set"; exit 1; }'
-      - name: soulcraft-ci token (reads the private workspace for the cast guard)
+      - name: the meta repo (org variable META_REPO, owner/name; the app token wants the bare name)
+        id: meta
+        env:
+          META_REPO: ${{ vars.META_REPO || 'SoulCraft-Org/workspace' }}
+        run: |
+          echo "repo=$META_REPO" >> "$GITHUB_OUTPUT"
+          echo "name=${META_REPO#*/}" >> "$GITHUB_OUTPUT"
+      - name: soulcraft-ci token (reads the private meta repo for the cast guard)
         id: app
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ secrets.CI_APP_ID }}
           private-key: ${{ secrets.CI_APP_KEY }}
           owner: ${{ github.repository_owner }}
-          repositories: workspace
-      - name: the workspace's cast tool
+          repositories: ${{ steps.meta.outputs.name }}
+      - name: the meta repo's cast tool
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: ${{ github.repository_owner }}/workspace
+          repository: ${{ steps.meta.outputs.repo }}
           token: ${{ steps.app.outputs.token }}
           path: workspace
           sparse-checkout: tools/cast
