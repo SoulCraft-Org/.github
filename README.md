@@ -27,14 +27,16 @@ Secrets the workflows read (organization secrets, set by `workspace/org/apply.sh
 `soulcraft-ci` GitHub App that lets a package's CI read the private workspace's cast tool, and opens
 gitleaks-release.yml's pull requests here (Contents, Pull requests and Workflows write on this repository); `ROUTER_APP_KEY`
 (with the variable `ROUTER_CLIENT_ID`), the `soulcraft-router` app of the CI router below. The organization
-variable `COMFY_BASE_REPO` says where ComfyUI Base lives (default `SoulCraft-Org/ComfyUI-Base`), and `CI_RUNNER`
-(private repositories only) where the jobs run: `hf` is the organization's self-hosted runner on a free Hugging Face
-Space (label `soulcraft-hf`, runner group `hf-free`; SoulCraft-Org/workspace `ci/hf-runner/`), anything else GitHub's
-`ubuntu-24.04`.
+variable `COMFY_BASE_REPO` says where ComfyUI Base lives (default `SoulCraft-Org/ComfyUI-Base`). Where the jobs run
+depends on the repository, not on a variable (Paul, 2026-10-26): a **private** repository's jobs always run on the
+organization's self-hosted runners (label `soulcraft-hf`, or `soulcraft-free` while `CI_POOL` is `on`; runner group
+`hf-free`; SoulCraft-Org/workspace `ci/hf-runner/`) and never on GitHub-hosted minutes; a **public** repository uses
+GitHub's `ubuntu-24.04`, which costs it nothing (the runner group refuses public repositories). The old switch
+`CI_RUNNER` (`hf`) no longer decides this.
 
 What runs when, so testing costs nothing (2026-10-16): **tier 0** is ComfyUI Base's `_build/quick.sh <pkg>`, seconds,
 run by whoever makes a change; **tier 1** is `package-ci.yml` on each pull request (not again on the merge to main:
-the pull request already ran it) and on each release tag, on the free self-hosted runner while `CI_RUNNER` is `hf`;
+the pull request already ran it) and on each release tag, on the free self-hosted runner;
 **tier 2** is `package-gpu.yml`, by hand, on the pod.
 
 ## The CI router: a free slot first, overflow minutes second
@@ -46,8 +48,8 @@ free pool (`soulcraft-hf`, or `soulcraft-free` while `CI_POOL` is `on`) when a s
 and overflow is on, it sends `verify` to the first overflow label that has used less than 90% of its free minutes this
 month; with none left, `verify` waits for a slot as before. The required check stays `verify / verify`; `route` is an
 extra check beside it. The run's summary and the `route` job's log say why it picked what it picked (`route:
-["ubuntu-latest"]: 0 of 2 online soulcraft-hf slots idle (reserve 0); overflow to ubuntu-latest (12 of its 3000 free
-minutes used in 2026-10)`).
+["blacksmith-2vcpu-ubuntu-2404-arm"]: 0 of 2 online soulcraft-hf slots idle (reserve 0); overflow to
+blacksmith-2vcpu-ubuntu-2404-arm (12 of its 4800 free minutes used in 2026-10)`).
 
 **The minute count is GitHub's own job history**, not a counter anyone writes: every job of this month's completed runs
 that called `package-ci.yml`, summed per overflow label, each rounded up to a whole minute (how GitHub and Blacksmith
@@ -71,16 +73,16 @@ secrets), an API error or unreadable data all route to the free pool.
 
 | Variable | Value | Effect |
 |---|---|---|
-| `CI_ROUTER` | `on` | the `route` job runs, in private repositories while `CI_RUNNER` is `hf`. **Unset: today's behaviour**, `route` is skipped and `verify` picks its runner as before |
+| `CI_ROUTER` | `on` | the `route` job runs, in private repositories. **Unset: today's behaviour**, `route` is skipped and `verify` picks its runner as before |
 | `CI_OVERFLOW_ENABLED` | `true` | the kill switch: overflow allowed when no slot is idle. Anything else, or unset: never overflow (wait for a slot) |
-| `CI_OVERFLOW_LABELS` | `<runs-on label>=<free minutes a month> ...` in order | where overflow goes, first choice first. `ubuntu-latest=3000` (GitHub Team); once Blacksmith's app is installed, `blacksmith-2vcpu-ubuntu-2404-arm=4800 ubuntu-latest=3000`; later Ubicloud at the end. **Never list a label no runner serves**: a job waits 24 hours for it |
+| `CI_OVERFLOW_LABELS` | `<runs-on label>=<free minutes a month> ...` in order | where overflow goes, first choice first. `blacksmith-2vcpu-ubuntu-2404-arm=4800` (Blacksmith's app is installed); later Ubicloud at the end. **Never list a GitHub-hosted label** (`ubuntu-latest`, `ubuntu-24.04`): the private repositories draw no GitHub-hosted minutes (Paul, 2026-10-26). **Never list a label no runner serves**: a job waits 24 hours for it |
 | `CI_ROUTER_RESERVE` | a number, default `0` | overflow while this many slots or fewer are idle, keeping them for jobs the router does not route (gitleaks, release tags, other workflows). `0` = overflow only when every slot is busy |
 
 ### Turning overflow on and off
 
-On (the router, then overflow to GitHub's minutes until Blacksmith is installed):
+On (the router, then overflow to Blacksmith's free minutes):
 
-    gh variable set CI_OVERFLOW_LABELS  --org SoulCraft-Org --visibility private --body "ubuntu-latest=3000"
+    gh variable set CI_OVERFLOW_LABELS  --org SoulCraft-Org --visibility private --body "blacksmith-2vcpu-ubuntu-2404-arm=4800"
     gh variable set CI_OVERFLOW_ENABLED --org SoulCraft-Org --visibility private --body true
     gh variable set CI_ROUTER           --org SoulCraft-Org --visibility private --body on
 

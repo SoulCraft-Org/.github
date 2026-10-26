@@ -50,14 +50,14 @@ jobs:
   # job picks verify's runner before verify starts: a free self-hosted slot when one is idle; else, while
   # CI_OVERFLOW_ENABLED is true, the first label in CI_OVERFLOW_LABELS that has used less than 90% of its free minutes
   # this month; else the free pool anyway (verify waits for a slot, as before). Only with CI_ROUTER=on in a private
-  # repository (CI_RUNNER=hf); otherwise it is skipped and verify picks its runner exactly as before.
+  # repository; otherwise it is skipped and verify picks its runner exactly as before.
   # It runs on its own light runner processes (label soulcraft-router), never GitHub-hosted: a hosted job is billed a
   # whole minute. It reads and never writes: the runner list, and for the minute count GitHub's own job history (below).
   # It never fails: no router token (the app not set up, a Dependabot run), an API error or unreadable data all route
   # to the free pool. No concurrency group: GitHub scopes those to one repository, and a wrong guess between two routers
   # costs one job a wait for a slot, never minutes.
   route:
-    if: vars.CI_RUNNER == 'hf' && vars.CI_ROUTER == 'on'
+    if: github.event.repository.private && vars.CI_ROUTER == 'on'
     runs-on: soulcraft-router
     timeout-minutes: 5
     outputs:
@@ -163,13 +163,13 @@ jobs:
   verify:
     needs: route
     if: ${{ !cancelled() }}         # also when route is skipped (CI_ROUTER unset)
-    # The router's pick when it ran. Otherwise CI_RUNNER (organization variable, private repositories only): "hf" while
-    # GitHub-hosted minutes are out; the job then runs on SoulCraft-Org's self-hosted runners (runner group hf-free).
-    # Unset or "github": GitHub's ubuntu-24.04.
+    # The router's pick when it ran. Otherwise a private repository runs on SoulCraft-Org's self-hosted runners (runner
+    # group hf-free) whatever the organization variable CI_RUNNER says: GitHub-hosted minutes are never spent on a
+    # private repository (Paul, 2026-10-26). A public repository would get GitHub's ubuntu-24.04, which costs it nothing.
     # Self-hosted, CI_POOL picks which: "on" = label soulcraft-free, any free runner, the never-sleeping linux-arm64 one on
     # Oracle Cloud included (this gate is proven on arm64; workspace ci/oracle-runner/); unset = label soulcraft-hf, the
     # Hugging Face Spaces (x64, workspace ci/hf-runner/).
-    runs-on: ${{ needs.route.outputs.labels && fromJSON(needs.route.outputs.labels) || (vars.CI_RUNNER == 'hf' && (vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf') || 'ubuntu-24.04') }}
+    runs-on: ${{ needs.route.outputs.labels && fromJSON(needs.route.outputs.labels) || (github.event.repository.private && (vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf') || 'ubuntu-24.04') }}
     timeout-minutes: 90
     env:
       NAME: ${{ github.event.repository.name }}
