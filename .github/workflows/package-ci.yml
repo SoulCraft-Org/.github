@@ -242,7 +242,7 @@ jobs:
       # base_test reaches pytest through `uv run --no-project --python <newest> --with pytest`. The Oracle runners keep
       # their uv cache on disk between jobs (UV_CACHE_DIR, workspace ci/oracle-runner/): the GitHub cache would only
       # download it again and upload it whole, so they skip it.
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         if: steps.scope.outputs.gate == 'run'
         with:
           enable-cache: ${{ !startsWith(runner.name, 'soulcraft-oracle') }}
