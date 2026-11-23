@@ -1,0 +1,42 @@
+name: pages-publish
+
+# Publishes the Process page and the Quality, Speed and Consumption page to GitHub Pages on every push to main. The
+# build is pages-build.yml's; a pull request builds it in pages.yml.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A deploy always finishes; a newer push queues behind it.
+concurrency:
+  group: pages-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/pages-build.yml
+    permissions:
+      contents: read
+      actions: read
+      checks: read
+      issues: read
+      pull-requests: read
+      vulnerability-alerts: read
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'      # a dispatch from any other branch builds but never publishes
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
