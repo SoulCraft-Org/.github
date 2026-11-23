@@ -41,10 +41,7 @@ jobs:
       id-token: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
+      # No checkout: Gemini has no file tools, so the pull request's own files never steer it.
       - name: Prompt context
         env:
           REPOSITORY: ${{ github.repository }}
@@ -94,13 +91,6 @@ jobs:
           JSON
           jq -e . .gemini/settings.json > /dev/null
 
-      - id: auth
-        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
-        with:
-          project_id: ${{ vars.GOOGLE_CLOUD_PROJECT }}
-          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
-          service_account: ${{ vars.SERVICE_ACCOUNT_EMAIL }}
-
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 26
@@ -110,7 +100,7 @@ jobs:
           GEMINI_CLI_VERSION: 0.70.0
           REVIEW_EXTENSION_REF: dd1a10d2c9d07b2ebade866590fdfa59cd8f9d04
         run: |
-          npm install --silent --no-audit --global "@google/gemini-cli@${GEMINI_CLI_VERSION}"
+          npm install --silent --no-audit --ignore-scripts --global "@google/gemini-cli@${GEMINI_CLI_VERSION}"
           gemini --version
           # The extension at a pinned commit.
           src="$RUNNER_TEMP/code-review"
@@ -121,6 +111,14 @@ jobs:
             mkdir -p "$HOME/.gemini/extensions" && cp -R "$src" "$HOME/.gemini/extensions/code-review"
           fi
           gemini extensions list < /dev/null || true
+
+      # Sign in only after every install, so no install script can reach the Google credential.
+      - id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: ${{ vars.GOOGLE_CLOUD_PROJECT }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.SERVICE_ACCOUNT_EMAIL }}
 
       - name: Gemini review
         env:

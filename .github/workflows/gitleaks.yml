@@ -101,13 +101,19 @@ jobs:
             exit 0
           fi
           marker="gitleaks:""allow"
-          hits=$(git log --no-merges --patch --unified=0 --text --no-color --no-ext-diff --format='commit %H' "origin/$BASE..HEAD" |
-            awk -v m="$marker" '
-              /^commit /    { sha = substr($2, 1, 12); next }
+          scan() {
+            awk -v m="$marker" -v who="$1" '
+              /^commit /    { who = "commit " substr($2, 1, 12); next }
               /^diff --git / { file = $NF; sub(/^b\//, "", file); next }
               /^@@ /        { n = $3; sub(/^\+/, "", n); split(n, p, ","); line = p[1]; next }
-              /^\+/         { if (index($0, m)) print file ":" line " (commit " sha ")"; line++ }
-            ')
+              /^\+/         { if (index($0, m)) print file ":" line " (" who ")"; line++ }
+            '
+          }
+          # Every commit the pull request adds, and its net diff from the merge base, so a line added only while
+          # merging is seen too. Each read fails the step on its own if git fails.
+          by_commit=$(git log --no-merges --patch --unified=0 --text --no-color --no-ext-diff --format='commit %H' "origin/$BASE..HEAD" | scan commit)
+          net=$(git diff --unified=0 --text --no-color --no-ext-diff "origin/$BASE...HEAD" | scan "net diff")
+          hits=$(printf '%s\n%s\n' "$by_commit" "$net" | sed '/^$/d' | sort -u)
           if [ -n "$hits" ]; then
             printf '%s\n' "$hits"
             echo "::error::This pull request adds a $marker comment (listed above). New allow comments are refused: remove it, then fix the finding or allowlist it in .gitleaks.toml on $BASE."
