@@ -56,6 +56,7 @@ jobs:
 
 | Folder | Holds |
 |---|---|
+| `.claude/` | Claude Code settings for contributors: deny rules and the review plugins |
 | `.github/` | Shared workflows, issue forms, pull request template, code owners, Dependabot config |
 | `profile/` | The org profile page and its images |
 | `quality/` | The Quality and Process pages' config: tabs, targets, 9 process maps |
