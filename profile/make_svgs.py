@@ -1,6 +1,6 @@
 """make_svgs.py: builds hero.svg (the brand lockup, animated) and divider.svg for SoulCraft-Org's profile README (profile/README.md).
 
-The lockup PNG (rendered by the brand-assets repo's build.py with the real Outfit and Lora fonts) is embedded as the base
+The lockup PNG (rendered from the brand files with the real Outfit and Lora fonts) is embedded as the base
 layer, so the type is exact on GitHub, which loads no web fonts inside an SVG image. Everything animated is drawn
 over it at the lockup's own coordinates (lockup-horizontal.svg: the mark is translate(40,60) scale(0.66) of a
 600x600 group whose star centre is (300,296), so (238,255) here).
@@ -12,7 +12,7 @@ import sys
 
 HERE = pathlib.Path(__file__).parent
 # usage: python3 make_svgs.py <lockup-horizontal.png> [out dir, default: beside this script]
-#   the PNG is SoulCraft-Org/brand-assets' 01_Brand/logo/lockup-horizontal.png
+#   the PNG is the brand's horizontal logo lockup
 lockup = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else HERE / "lockup-horizontal.png"
 out = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 else HERE
 png = base64.b64encode(lockup.read_bytes()).decode()

@@ -41,11 +41,14 @@ jobs:
       id-token: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
+      # No checkout, and Gemini works in a folder made fresh for this job: Gemini has no file tools, so neither the pull
+      # request's files nor anything an earlier job left on the runner can steer it.
+      - name: Fresh review folder
+        working-directory: ${{ runner.temp }}
+        run: rm -rf review && mkdir review
 
       - name: Prompt context
+        working-directory: ${{ runner.temp }}/review
         env:
           REPOSITORY: ${{ github.repository }}
           PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
@@ -73,6 +76,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/mcp" && tar -xzf "$tgz" -C "$RUNNER_TEMP/mcp" github-mcp-server
 
       - name: Gemini settings
+        working-directory: ${{ runner.temp }}/review
         run: |
           cat > .gemini/settings.json <<JSON
           {
@@ -94,13 +98,6 @@ jobs:
           JSON
           jq -e . .gemini/settings.json > /dev/null
 
-      - id: auth
-        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
-        with:
-          project_id: ${{ vars.GOOGLE_CLOUD_PROJECT }}
-          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
-          service_account: ${{ vars.SERVICE_ACCOUNT_EMAIL }}
-
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 26
@@ -110,7 +107,7 @@ jobs:
           GEMINI_CLI_VERSION: 0.70.0
           REVIEW_EXTENSION_REF: dd1a10d2c9d07b2ebade866590fdfa59cd8f9d04
         run: |
-          npm install --silent --no-audit --global "@google/gemini-cli@${GEMINI_CLI_VERSION}"
+          npm install --silent --no-audit --ignore-scripts --global "@google/gemini-cli@${GEMINI_CLI_VERSION}"
           gemini --version
           # The extension at a pinned commit.
           src="$RUNNER_TEMP/code-review"
@@ -122,7 +119,16 @@ jobs:
           fi
           gemini extensions list < /dev/null || true
 
+      # Sign in only after every install, so no install script can reach the Google credential.
+      - id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: ${{ vars.GOOGLE_CLOUD_PROJECT }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.SERVICE_ACCOUNT_EMAIL }}
+
       - name: Gemini review
+        working-directory: ${{ runner.temp }}/review
         env:
           GEMINI_CLI_TRUST_WORKSPACE: 'true'
           GITHUB_TOKEN: ${{ github.token }}

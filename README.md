@@ -18,7 +18,7 @@ flowchart LR
 
 ## Call a shared workflow
 
-Callers use `@main`, so a change here reaches every caller. `gemini-review.yml` needs the variables named in its header.
+SoulCraft-Org's own repos call `@main`, so a change here reaches every caller. Outside this org, pin a full commit SHA instead of `@main`, so the workflow can't change under you. `gemini-review.yml` needs the variables named in its header.
 
 ```yaml
 # gitleaks.yml: scans the whole git history for secrets
