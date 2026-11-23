@@ -1,0 +1,7 @@
+{
+ "name": "Git Crafter CI standard",
+ "description": "Calls Git Crafter's reusable CI workflow on GitHub's standard runners, and ends in one required check, ci / ci-ok.",
+ "iconName": "octicon check-circle",
+ "categories": ["Continuous integration"],
+ "filePatterns": ["^(README\\.md|package\\.json|pyproject\\.toml|requirements\\.txt)$"]
+}

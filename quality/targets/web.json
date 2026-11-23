@@ -1,0 +1,135 @@
+[
+ {
+  "id": "design.raw_hex",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the Pages site is the page Git Crafter generates, so Git Crafter measures its design, usability and headers on its own page; this repo serves no web app of its own."
+  }
+ },
+ {
+  "id": "design.raw_px",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the Pages site is the page Git Crafter generates, so Git Crafter measures its design, usability and headers on its own page; this repo serves no web app of its own."
+  }
+ },
+ {
+  "id": "design.font_sizes_off_scale",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the Pages site is the page Git Crafter generates, so Git Crafter measures its design, usability and headers on its own page; this repo serves no web app of its own."
+  }
+ },
+ {
+  "id": "design.text_colors_off_token",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the Pages site is the page Git Crafter generates, so Git Crafter measures its design, usability and headers on its own page; this repo serves no web app of its own."
+  }
+ },
+ {
+  "id": "design.contrast_violations",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the Pages site is the page Git Crafter generates, so Git Crafter measures its design, usability and headers on its own page; this repo serves no web app of its own."
+  }
+ },
+ {
+  "id": "design.lcp_mobile",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the Pages site is the page Git Crafter generates, so Git Crafter measures its design, usability and headers on its own page; this repo serves no web app of its own."
+  }
+ },
+ {
+  "id": "design.cls_mobile",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the Pages site is the page Git Crafter generates, so Git Crafter measures its design, usability and headers on its own page; this repo serves no web app of its own."
+  }
+ },
+ {
+  "id": "design.total_bytes",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the Pages site is the page Git Crafter generates, so Git Crafter measures its design, usability and headers on its own page; this repo serves no web app of its own."
+  }
+ },
+ {
+  "id": "usability.reading_grade",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the Pages site is the page Git Crafter generates, so Git Crafter measures its design, usability and headers on its own page; this repo serves no web app of its own."
+  }
+ },
+ {
+  "id": "usability.long_sentences",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the Pages site is the page Git Crafter generates, so Git Crafter measures its design, usability and headers on its own page; this repo serves no web app of its own."
+  }
+ },
+ {
+  "id": "usability.axe_violations",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the Pages site is the page Git Crafter generates, so Git Crafter measures its design, usability and headers on its own page; this repo serves no web app of its own."
+  }
+ },
+ {
+  "id": "usability.target_size_375",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the Pages site is the page Git Crafter generates, so Git Crafter measures its design, usability and headers on its own page; this repo serves no web app of its own."
+  }
+ },
+ {
+  "id": "usability.unlabeled_fields",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the Pages site is the page Git Crafter generates, so Git Crafter measures its design, usability and headers on its own page; this repo serves no web app of its own."
+  }
+ },
+ {
+  "id": "usability.broken_links",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the Pages site is the page Git Crafter generates, so Git Crafter measures its design, usability and headers on its own page; this repo serves no web app of its own."
+  }
+ },
+ {
+  "id": "usability.keyboard_task_share",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the Pages site is the page Git Crafter generates, so Git Crafter measures its design, usability and headers on its own page; this repo serves no web app of its own."
+  }
+ },
+ {
+  "id": "usability.task_clicks",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the Pages site is the page Git Crafter generates, so Git Crafter measures its design, usability and headers on its own page; this repo serves no web app of its own."
+  }
+ },
+ {
+  "id": "usability.words_before_action",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the Pages site is the page Git Crafter generates, so Git Crafter measures its design, usability and headers on its own page; this repo serves no web app of its own."
+  }
+ },
+ {
+  "id": "usability.tbt_mobile",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the Pages site is the page Git Crafter generates, so Git Crafter measures its design, usability and headers on its own page; this repo serves no web app of its own."
+  }
+ },
+ {
+  "id": "usability.form_page_kib",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the Pages site is the page Git Crafter generates, so Git Crafter measures its design, usability and headers on its own page; this repo serves no web app of its own."
+  }
+ }
+]

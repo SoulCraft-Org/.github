@@ -1,0 +1,61 @@
+[
+ {
+  "id": "issues.open_bugs",
+  "params": {
+   "comment": "Issue types: Feature joins Bug and Task because Projects are off, so an idea stays an issue and is not parked. Area labels name this repo's three areas. The threat model is reviewed when a shared workflow or a starter changes; the 14-day grace matches the Dependabot cooldown, so a pin bump alone is not a change of surface.",
+   "issue_types": [
+    "Bug",
+    "Task",
+    "Feature"
+   ],
+   "area_labels": [
+    "workflows",
+    "defaults",
+    "profile"
+   ],
+   "threat_model": "THREAT-MODEL.md",
+   "threat_model_covers": [
+    ".github/workflows/gitleaks.yml",
+    ".github/workflows/gemini-review.yml",
+    ".github/workflows/dependabot-automerge.yml",
+    "workflow-templates"
+   ],
+   "threat_model_grace_days": 14
+  }
+ },
+ {
+  "id": "security.claude_review_share",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: pull request review here is advisory and by people, and the metric reads only a Claude app's review."
+  }
+ },
+ {
+  "id": "security.headers",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: GitHub Pages sets no Content-Security-Policy or Referrer-Policy, and this repo cannot add headers to the Pages site, so 4 of 4 is out of reach."
+  }
+ },
+ {
+  "id": "actions.locked_share",
+  "drop": true,
+  "params": {
+   "comment": "Not adopted: gh actions-lock rewrites each SHA pin to a tag and moves the SHA into the lockfile, and this organization's Actions policy refuses any action not pinned to a full SHA in the workflow. Every action here is SHA-pinned (actions.pinned_share). Revisit when the lockfile can sit beside SHA pins."
+  }
+ },
+ {
+  "id": "security.lockfile_registry_share",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the repo has no package-lock.json to read."
+  }
+ },
+ {
+  "id": "security.young_lockfile_packages",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the repo has no package-lock.json to read."
+  }
+ }
+]

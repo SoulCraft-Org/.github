@@ -1,0 +1,6 @@
+# What a Quality page run writes: a local run reads this machine, a CI run builds the page. Never committed.
+quality/dist/
+quality/data/
+quality/history/
+quality/process/data/
+__pycache__/

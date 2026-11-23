@@ -1,0 +1,88 @@
+[
+ {
+  "id": "code.long_files",
+  "params": {
+   "areas": [
+    "profile"
+   ],
+   "comment": "The one code area is profile/, the script that draws the org profile's pictures."
+  }
+ },
+ {
+  "id": "code.test_coverage_pct",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: this repo has no test suite, so coverage cannot reach its goal; the CI checks compile the script and parse every config; it holds one Python script (profile/make_svgs.py) and workflows."
+  }
+ },
+ {
+  "id": "code.worker_wall_max_ms",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: this repo has no Cloudflare Worker; it holds one Python script (profile/make_svgs.py) and workflows."
+  }
+ },
+ {
+  "id": "code.worker_cpu_max_ms",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: this repo has no Cloudflare Worker; it holds one Python script (profile/make_svgs.py) and workflows."
+  }
+ },
+ {
+  "id": "code.worker_bundle_kb",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: this repo has no Cloudflare Worker; it holds one Python script (profile/make_svgs.py) and workflows."
+  }
+ },
+ {
+  "id": "code.worker_startup_ms",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: this repo has no Cloudflare Worker; it holds one Python script (profile/make_svgs.py) and workflows."
+  }
+ },
+ {
+  "id": "code.build_seconds",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: this repo has no Cloudflare Worker; it holds one Python script (profile/make_svgs.py) and workflows."
+  }
+ },
+ {
+  "id": "code.client_js_kb",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: this repo has no built client site; it holds one Python script (profile/make_svgs.py) and workflows."
+  }
+ },
+ {
+  "id": "code.check_seconds",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: this repo has no separate check job to time; ci.latest_full_run_minutes times the CI run; it holds one Python script (profile/make_svgs.py) and workflows."
+  }
+ },
+ {
+  "id": "code.dead_files",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: this repo has no JavaScript or TypeScript project for knip to read; it holds one Python script (profile/make_svgs.py) and workflows."
+  }
+ },
+ {
+  "id": "code.dead_exports",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: this repo has no JavaScript or TypeScript project for knip to read; it holds one Python script (profile/make_svgs.py) and workflows."
+  }
+ },
+ {
+  "id": "code.dead_dependencies",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: this repo has no JavaScript or TypeScript project for knip to read; it holds one Python script (profile/make_svgs.py) and workflows."
+  }
+ }
+]

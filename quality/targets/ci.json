@@ -1,0 +1,9 @@
+[
+ {
+  "id": "ci.skip_unchanged_share",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the secret scan, the review and the auto-merge workflows run on every change by design, so most of this repo's triggers carry no paths filter; the share cannot reach its goal."
+  }
+ }
+]

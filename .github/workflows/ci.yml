@@ -1,0 +1,30 @@
+name: ci
+
+# Git Crafter's CI standard: its reusable workflow checks every workflow against the standard and runs the short job,
+# here two cheap checks on what this repo holds (the standard itself parses every workflow).
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  ci:
+    uses: SoulCraft-Org/git-crafter/.github/workflows/ci-standard.yml@8023bd4683416f6d420bd20d137960b09c06b91e # v7.0.2
+    with:
+      paths: |
+        .github/**
+        workflow-templates/**
+        profile/**
+        quality/**
+        **/*.md
+        .pre-commit-config.yaml
+      short: |
+        python3 -I -m py_compile profile/make_svgs.py
+        git ls-files -z '*.json' | xargs -0 python3 -I -c 'import json, sys; [json.load(open(f, encoding="utf-8")) for f in sys.argv[1:]]'

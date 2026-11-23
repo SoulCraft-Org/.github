@@ -1,0 +1,17 @@
+{
+ "comment": "SoulCraft-Org/.github's Quality, Speed and Consumption page, from Git Crafter's starter (templates/quality/config.json at v7.0.2). Dropped tabs: discussions (Discussions are off in this repo, by decision) and projects (Projects are off, so there is no board to measure). Kept: pages, for the deploys of the repo's own GitHub Pages site (the Quality and Process pages Git Crafter builds); the design, usability and header metrics of that generated page are dropped in targets/web.json, since Git Crafter measures its own page. No packs: no Claude, credits or token tabs. A metric a docs-and-workflows repo cannot meet is dropped in targets/ with its reason in params.comment; a metric that needs an admin token stays and reads not measured in CI, never 0. Keys: Git Crafter quality/CONFIG.md.",
+ "name": "SoulCraft-Org .github",
+ "tabs": [
+  "code",
+  "documentation",
+  "issues",
+  "pull-requests",
+  "actions",
+  "security",
+  "dependabot",
+  "scanning",
+  "insights",
+  "settings",
+  "pages"
+ ]
+}

@@ -1,0 +1,29 @@
+name: ci
+
+# SoulCraft-Org starter: the Git Crafter CI standard. This repository calls Git Crafter's reusable workflow, which runs
+# each job on GitHub's standard hosted runners and ends in one verdict, ci / ci-ok, the check a ruleset on the default
+# branch requires. Save this file as .github/workflows/ci.yml, then set paths, short and standard. The pin is a full commit
+# SHA of a Git Crafter release with its version beside it; Dependabot's github-actions entry bumps it.
+on:
+  pull_request:
+  push:
+    branches: [ $default-branch ]
+
+permissions:
+  contents: read
+
+# A newer push cancels a pull request's older run; a push to the default branch always finishes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  ci:
+    uses: SoulCraft-Org/git-crafter/.github/workflows/ci-standard.yml@8023bd4683416f6d420bd20d137960b09c06b91e # v7.0.2
+    with:
+      # Path globs, one per line, whose change makes the jobs run. Delete the input to run on every change.
+      paths: |
+        **
+      # Commands for the short job (ubuntu-slim, under 15 minutes, no Docker), and for the standard job (ubuntu-latest).
+      short: echo "replace this with the fast checks of this repository"
+      standard: ""
