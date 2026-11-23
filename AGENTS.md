@@ -23,4 +23,6 @@ commit, so nothing here may help an attacker or name a person.
 - **Every action is pinned to a full commit SHA, with its version as a comment beside it.** Never a tag or a branch.
 - **`profile/README.md` is the org's public face.** Change it only on the owner's word.
 - **The domain is `soulcraft.computer`.** The security and support contact is `support@soulcraft.computer`.
+- **Every pull request closes an issue** (`Closes #<n>` in its body), and the issue carries an area label: `workflows`,
+  `defaults` or `profile`.
 - **Stage by explicit path.** Never `git add -A` or `git add .`.
