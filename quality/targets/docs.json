@@ -6,10 +6,6 @@
     {
      "glob": ".github/pull_request_template.md",
      "why": "a form GitHub copies into each pull request, not a doc read in the repo"
-    },
-    {
-     "glob": "CLAUDE.md",
-     "why": "one import line (@AGENTS.md) that Claude Code loads; it holds no prose to read or to set out as a table or diagram"
     }
    ],
    "areas": [
@@ -73,24 +69,6 @@
      "area": [
       "{dir}/"
      ]
-    }
-   ],
-   "agent_docs": [
-    {
-     "glob": "**/CLAUDE.md",
-     "why": "project instructions Claude loads every session"
-    },
-    {
-     "glob": "**/AGENTS.md",
-     "why": "project instructions every agent loads every session, which CLAUDE.md imports"
-    },
-    {
-     "glob": "**/SKILL.md",
-     "why": "a skill Claude loads when it applies"
-    },
-    {
-     "glob": "**/.claude/**",
-     "why": "rules, agents and commands Claude loads"
     }
    ],
    "comment": "README.md covers every top-level folder (profile, workflow-templates, quality). Pinned workflow files are left out of every area on purpose: Dependabot bumps them, and a bump must not make a doc lag. SECURITY, SUPPORT and CODE_OF_CONDUCT are policies copied into other repos, so each covers nothing here (an empty area, a record)."
