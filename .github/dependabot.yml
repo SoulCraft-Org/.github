@@ -1,0 +1,17 @@
+# Keeps the shared workflows' actions current, pinned to full commit SHAs (the version is the comment beside each).
+# All action bumps arrive together in one pull request, which merges itself once `gitleaks` passes on it.
+# pre-commit: the gitleaks hook's frozen rev. gitleaks' own release in gitleaks.yml (VERSION and both SHA-256s)
+# moves by hand when this pull request shows a new release.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: daily
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: pre-commit
+    directory: /
+    schedule:
+      interval: daily

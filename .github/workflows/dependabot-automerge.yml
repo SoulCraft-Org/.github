@@ -1,0 +1,33 @@
+# Turns on GitHub auto-merge for Dependabot pull requests, majors included. The repository's required checks decide when
+# the merge happens, so a red run never merges. A repository calls it from .github/workflows/dependabot-automerge.yml:
+#
+#   # This file also runs on this repository's own pull requests.
+name: dependabot-automerge
+
+on:
+  workflow_call:
+  pull_request:
+
+permissions: {}
+
+jobs:
+  automerge:
+    # Dependabot's pull request, and Dependabot's own event: a person's push to its branch does not qualify.
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.actor == 'dependabot[bot]'
+    # Only SoulCraft-Org's private repositories use the organization's runners; every other caller gets GitHub's.
+    runs-on: ${{ github.repository_owner == 'SoulCraft-Org' && github.event.repository.private && 'soulcraft-hf' || 'ubuntu-24.04' }}
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: turn on auto-merge (squash, the only method the rulesets allow)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.html_url }}
+        run: |
+          if [ "$(gh pr view "$PR" --json autoMergeRequest --jq '.autoMergeRequest != null')" = "true" ]; then
+            echo "auto-merge is already on for $PR"
+          else
+            gh pr merge --auto --squash "$PR"
+          fi

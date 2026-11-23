@@ -1,0 +1,115 @@
+# Secret scan: gitleaks over the whole git history, failing on any finding (secret values are redacted in the log).
+#
+#   jobs:
+#     gitleaks:
+#       uses: SoulCraft-Org/.github/.github/workflows/gitleaks.yml@main
+#
+# What fails it: a secret anywhere in the history, or, on a pull request, a commit that adds an inline allow comment.
+# A false positive is allowlisted in the repository's .gitleaksignore (one finding fingerprint per line, printed in the
+# log) or in its .gitleaks.toml. The scan reads both files only from the pull request's base branch, so a change to
+# either counts once it is merged. Allow comments already in the history keep working. A false positive in a pull
+# request's own commits takes a path or regex allowlist in .gitleaks.toml (a squash merge changes a fingerprint's commit).
+name: gitleaks
+
+on:
+  workflow_call:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    # Private SoulCraft-Org repositories run on the organization's own runners; every other caller runs on GitHub's.
+    runs-on: ${{ github.event.repository.private && github.repository_owner == 'SoulCraft-Org' && (vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf') || 'ubuntu-24.04' }}
+    timeout-minutes: 15
+    env:
+      VERSION: 8.30.1
+      SHA256_X64: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+      SHA256_ARM64: e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0               # every commit, not just the tip
+          persist-credentials: false
+
+      - name: gitleaks ${{ env.VERSION }} (checksum verified)
+        run: |
+          case "$RUNNER_ARCH" in
+            X64)   arch=x64;   sum="$SHA256_X64" ;;
+            ARM64) arch=arm64; sum="$SHA256_ARM64" ;;
+            *) echo "::error::no gitleaks tarball pinned for $RUNNER_ARCH"; exit 1 ;;
+          esac
+          curl -fsSL -o "$RUNNER_TEMP/gitleaks.tgz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v$VERSION/gitleaks_${VERSION}_linux_$arch.tar.gz"
+          echo "$sum  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP" gitleaks
+
+      - name: the other architecture's gitleaks ${{ env.VERSION }} (checksum verified)
+        if: github.repository == 'SoulCraft-Org/.github'
+        run: |
+          case "$RUNNER_ARCH" in
+            X64) arch=arm64; sum="$SHA256_ARM64" ;;
+            *)   arch=x64;   sum="$SHA256_X64" ;;
+          esac
+          curl -fsSL -o "$RUNNER_TEMP/other.tgz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v$VERSION/gitleaks_${VERSION}_linux_$arch.tar.gz"
+          echo "$sum  $RUNNER_TEMP/other.tgz" | sha256sum -c -
+
+      # The rules and the ignore list come from the base branch, never from the scanned tree, so a pull request cannot
+      # loosen the scan for itself.
+      - name: the rules (gitleaks' defaults, or the base branch's .gitleaks.toml)
+        env:
+          BASE: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
+        run: |
+          if git cat-file -e "origin/$BASE:.gitleaks.toml" 2>/dev/null; then
+            git show "origin/$BASE:.gitleaks.toml" > "$RUNNER_TEMP/gitleaks.toml"
+            echo "rules: .gitleaks.toml as $BASE has it"
+          else
+            printf '[extend]\nuseDefault = true\n' > "$RUNNER_TEMP/gitleaks.toml"
+            echo "rules: gitleaks' defaults"
+          fi
+
+      - name: the ignore list (the base branch's .gitleaksignore)
+        env:
+          BASE: ${{ github.event.pull_request.base.ref || github.event.repository.default_branch }}
+        run: |
+          if git cat-file -e "origin/$BASE:.gitleaksignore" 2>/dev/null; then
+            git show "origin/$BASE:.gitleaksignore" > "$RUNNER_TEMP/gitleaksignore"
+            echo "ignore list: .gitleaksignore as $BASE has it"
+          else
+            : > "$RUNNER_TEMP/gitleaksignore"
+            echo "ignore list: none"
+          fi
+          rm -f .gitleaksignore        # gitleaks also reads one from the work tree; only the base branch's counts
+
+      # Every commit the pull request adds is checked, not only the final diff, so an allow comment added in one commit
+      # and removed in the next is still refused. Only file names and line numbers are printed, never the lines.
+      - name: no new allow comments (pull requests)
+        if: github.event_name == 'pull_request'
+        shell: bash               # -eo pipefail: a failed git log fails the step instead of finding nothing
+        env:
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          marker="gitleaks:""allow"
+          hits=$(git log --no-merges --patch --unified=0 --text --no-color --no-ext-diff --format='commit %H' "origin/$BASE..HEAD" |
+            awk -v m="$marker" '
+              /^commit /    { sha = substr($2, 1, 12); next }
+              /^diff --git / { file = $NF; sub(/^b\//, "", file); next }
+              /^@@ /        { n = $3; sub(/^\+/, "", n); split(n, p, ","); line = p[1]; next }
+              /^\+/         { if (index($0, m)) print file ":" line " (commit " sha ")"; line++ }
+            ')
+          if [ -n "$hits" ]; then
+            printf '%s\n' "$hits"
+            echo "::error::This pull request adds a $marker comment (listed above). New allow comments are refused: remove it, then fix the finding or allowlist it in .gitleaks.toml on $BASE."
+            exit 1
+          fi
+          echo "no allow comment added"
+
+      # HEAD's whole history (on a pull request, the merge preview), not --all, so another branch's finding does not
+      # fail this run.
+      - name: no secret anywhere in the history
+        run: '"$RUNNER_TEMP/gitleaks" git --config "$RUNNER_TEMP/gitleaks.toml" --gitleaks-ignore-path "$RUNNER_TEMP/gitleaksignore" --log-opts=HEAD --redact --verbose --exit-code 1 .'

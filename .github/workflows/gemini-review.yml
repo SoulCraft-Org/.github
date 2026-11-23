@@ -1,0 +1,144 @@
+# Advisory Gemini review of each pull request. It only comments and is never a required check. A repository calls it
+# from its own workflow file:
+#
+#   on:
+#     pull_request:
+#       types: [opened, reopened, ready_for_review]
+#   permissions: {}
+#   jobs:
+#     review:
+#       uses: SoulCraft-Org/.github/.github/workflows/gemini-review.yml@main
+#       permissions: {contents: read, id-token: write, pull-requests: write}
+#
+# Google sign-in is keyless: GitHub's OIDC token goes through a Workload Identity provider, so there is no secret. The
+# caller needs these variables: GCP_WIF_PROVIDER, SERVICE_ACCOUNT_EMAIL, GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION and
+# GOOGLE_GENAI_USE_VERTEXAI. GEMINI_REVIEW=on is the switch: any other value stops every review. Skipped: drafts, pull
+# requests from forks (no OIDC token there) and bot authors such as Dependabot.
+# Based on google-github-actions/run-gemini-cli examples/workflows/pr-review.
+name: gemini-review
+
+on:
+  workflow_call:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  group: gemini-review-${{ github.repository }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: >-
+      vars.GEMINI_REVIEW == 'on' && !github.event.pull_request.draft
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.pull_request.user.type != 'Bot'
+    runs-on: ${{ github.repository_owner == 'SoulCraft-Org' && github.event.repository.private && (vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf') || 'ubuntu-24.04' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prompt context
+        env:
+          REPOSITORY: ${{ github.repository }}
+          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          mkdir -p .gemini
+          jq -n --arg repo "$REPOSITORY" --arg pr "$PULL_REQUEST_NUMBER" \
+            '{repository: $repo, pull_request_number: $pr, additional_context: ""}' > .gemini/context.json
+
+      # The steps of google-github-actions/run-gemini-cli v0.1.22, written out so every action stays pinned to a commit.
+      # Gemini gets only three review tools (no shell, no file access). Plan Mode and subagents are off.
+      - name: GitHub MCP server
+        env:
+          MCP_VERSION: 0.27.0
+          SHA256_X64: fb6af3268a4647b8382abec8cbdfa05d029ebbbdcf57db73219ba21cfbef71d9
+          SHA256_ARM64: a61cbfd099c2f973c982f446a6d0c8e8d43755b71687d82ed42fcd793c3c62c8
+        run: |
+          case "$(uname -m)" in
+            x86_64) arch=x86_64; sum="$SHA256_X64" ;;
+            aarch64|arm64) arch=arm64; sum="$SHA256_ARM64" ;;
+            *) echo "unsupported architecture $(uname -m)"; exit 1 ;;
+          esac
+          tgz="$RUNNER_TEMP/github-mcp-server.tar.gz"
+          curl -fsSL -o "$tgz" "https://github.com/github/github-mcp-server/releases/download/v${MCP_VERSION}/github-mcp-server_Linux_${arch}.tar.gz"
+          echo "$sum  $tgz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/mcp" && tar -xzf "$tgz" -C "$RUNNER_TEMP/mcp" github-mcp-server
+
+      - name: Gemini settings
+        run: |
+          cat > .gemini/settings.json <<JSON
+          {
+            "model": {"maxSessionTurns": 25},
+            "general": {"plan": {"enabled": false}},
+            "experimental": {"enableAgents": false},
+            "mcpServers": {
+              "github": {
+                "command": "$RUNNER_TEMP/mcp/github-mcp-server",
+                "args": ["stdio"],
+                "includeTools": ["add_comment_to_pending_review", "pull_request_read", "pull_request_review_write"],
+                "env": {"GITHUB_PERSONAL_ACCESS_TOKEN": "\${GITHUB_TOKEN}"}
+              }
+            },
+            "tools": {"exclude": ["run_shell_command", "write_file", "replace", "read_file", "read_many_files",
+                                  "list_directory", "glob", "search_file_content", "web_fetch", "google_web_search",
+                                  "enter_plan_mode", "exit_plan_mode", "invoke_agent"]}
+          }
+          JSON
+          jq -e . .gemini/settings.json > /dev/null
+
+      - id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: ${{ vars.GOOGLE_CLOUD_PROJECT }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.SERVICE_ACCOUNT_EMAIL }}
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Install Gemini CLI and the code-review extension
+        env:
+          GEMINI_CLI_VERSION: 0.70.0
+          REVIEW_EXTENSION_REF: dd1a10d2c9d07b2ebade866590fdfa59cd8f9d04
+        run: |
+          npm install --silent --no-audit --global "@google/gemini-cli@${GEMINI_CLI_VERSION}"
+          gemini --version
+          # The extension at a pinned commit.
+          src="$RUNNER_TEMP/code-review"
+          rm -rf "$src" "$HOME/.gemini/extensions/code-review"   # clear a copy left by an earlier job
+          git init -q "$src" && git -C "$src" fetch -q --depth 1 https://github.com/gemini-cli-extensions/code-review "$REVIEW_EXTENSION_REF"
+          git -C "$src" checkout -q FETCH_HEAD
+          if ! printf 'y\ny\n' | GEMINI_CLI_TRUST_WORKSPACE=true timeout 120 gemini extensions install "$src" --consent; then
+            mkdir -p "$HOME/.gemini/extensions" && cp -R "$src" "$HOME/.gemini/extensions/code-review"
+          fi
+          gemini extensions list < /dev/null || true
+
+      - name: Gemini review
+        env:
+          GEMINI_CLI_TRUST_WORKSPACE: 'true'
+          GITHUB_TOKEN: ${{ github.token }}
+          GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT }}
+          GOOGLE_CLOUD_LOCATION: ${{ vars.GOOGLE_CLOUD_LOCATION }}
+          GOOGLE_GENAI_USE_VERTEXAI: ${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          REPOSITORY: ${{ github.repository }}
+          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+          # The extension's prompt names the GitHub MCP server's old review tools; this maps them to
+          # pull_request_review_write (github-mcp-server v0.27.0).
+          ADDITIONAL_CONTEXT: >-
+            Tool names: for create_pending_pull_request_review call pull_request_review_write with method "create" and
+            no event; for submit_pending_pull_request_review call pull_request_review_write with method "submit_pending"
+            and event "COMMENT"; inline comments use add_comment_to_pending_review. Use only these GitHub tools.
+        run: |
+          timeout 480 gemini --yolo --output-format json \
+            --prompt "/pr-code-review Repository: $REPOSITORY. Pull request number: $PULL_REQUEST_NUMBER. $ADDITIONAL_CONTEXT" < /dev/null > "$RUNNER_TEMP/gemini.json"
+          jq -r '.stats // {} | tojson' "$RUNNER_TEMP/gemini.json" | head -c 2000
