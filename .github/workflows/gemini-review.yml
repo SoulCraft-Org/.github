@@ -34,7 +34,7 @@ jobs:
       vars.GEMINI_REVIEW == 'on' && !github.event.pull_request.draft
       && github.event.pull_request.head.repo.full_name == github.repository
       && github.event.pull_request.user.type != 'Bot'
-    runs-on: ${{ github.repository_owner == 'SoulCraft-Org' && github.event.repository.private && (vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf') || 'ubuntu-24.04' }}
+    runs-on: ${{ github.repository_owner == 'SoulCraft-Org' && github.event.repository.private && (vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf') || 'ubuntu-slim' }}
     timeout-minutes: 10
     permissions:
       contents: read
