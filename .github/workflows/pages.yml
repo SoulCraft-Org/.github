@@ -1,6 +1,6 @@
 name: pages
 
-# A pull request builds both pages and runs the docs.unmapped gate, without publishing (pages.yml publishes on a push to
+# A pull request builds both pages and runs the docs.unmapped gate, without publishing (pages-publish.yml publishes on a push to
 # main). Its trigger lists the doc globs, so a docs-only pull request runs the gate too.
 on:
   pull_request:
