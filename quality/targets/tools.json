@@ -1,0 +1,37 @@
+[
+ {
+  "id": "tools.deps_latest_share",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the repo has no package.json or lockfile; Dependabot bumps its actions and its pre-commit hook, read by tools.actions_latest_share and the Dependabot pull request metrics."
+  }
+ },
+ {
+  "id": "tools.majors_behind",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the repo has no package.json or lockfile; Dependabot bumps its actions and its pre-commit hook, read by tools.actions_latest_share and the Dependabot pull request metrics."
+  }
+ },
+ {
+  "id": "tools.oldest_update_wait_days",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the repo has no package.json or lockfile; Dependabot bumps its actions and its pre-commit hook, read by tools.actions_latest_share and the Dependabot pull request metrics."
+  }
+ },
+ {
+  "id": "tools.npm_ci_seconds",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the repo has no package.json or lockfile; Dependabot bumps its actions and its pre-commit hook, read by tools.actions_latest_share and the Dependabot pull request metrics."
+  }
+ },
+ {
+  "id": "tools.adopters_latest_share",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the repo cuts no version tags, so there is no latest tag to compare its callers' pins with; callers pin a commit."
+  }
+ }
+]

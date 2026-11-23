@@ -1,0 +1,234 @@
+{
+ "comment": "SoulCraft-Org/.github's Process page (Git Crafter templates/process, v7.0.2). It is also the repo's maps file. Seven library maps: the card step of triage is dropped (Projects are off), and adopt's update step reads the age of the oldest open Dependabot pull request, since the repo has no npm lockfile. Two own maps follow. Keys: Git Crafter actions/pages/action.yml; maps: pages/maps/README.md.",
+ "repos": [
+  ".github"
+ ],
+ "docs": {
+  "maps": "quality/process/config.json"
+ },
+ "repo_url": "https://github.com/SoulCraft-Org/.github/blob/main",
+ "maps": [
+  {
+   "use": "delivery"
+  },
+  {
+   "use": "deploy"
+  },
+  {
+   "use": "adopt",
+   "steps": {
+    "update": {
+     "metric": "tools.oldest_dependency_pr_days"
+    }
+   }
+  },
+  {
+   "use": "measure"
+  },
+  {
+   "use": "triage",
+   "steps": {
+    "card": {
+     "drop": true
+    }
+   }
+  },
+  {
+   "use": "secure"
+  },
+  {
+   "use": "document"
+  },
+  {
+   "id": "workflow-change",
+   "name": "Shared workflow change",
+   "why": "A change to a shared workflow, from pull request to the callers' next run",
+   "ideal": "A shared workflow changes by small pull request, scanned and reviewed first, merged in minutes; a bad change turns main red for minutes, not days.",
+   "sources": [
+    {
+     "title": "GitHub Docs: Reuse workflows",
+     "url": "https://docs.github.com/en/actions/sharing-automations/reusing-workflows",
+     "date": "2026-11-23"
+    },
+    {
+     "title": "GitHub Docs: Secure use reference",
+     "url": "https://docs.github.com/en/actions/reference/security/secure-use",
+     "date": "2026-11-23"
+    },
+    {
+     "title": "GitHub Docs: About push protection",
+     "url": "https://docs.github.com/en/code-security/secret-scanning/introduction/about-push-protection",
+     "date": "2026-11-23"
+    },
+    {
+     "title": "Google engineering practices: speed of code reviews",
+     "url": "https://google.github.io/eng-practices/review/reviewer/speed.html",
+     "date": "2026-11-23"
+    }
+   ],
+   "critical_path": [
+    "pr",
+    "scan",
+    "review",
+    "merge",
+    "callers"
+   ],
+   "steps": [
+    {
+     "id": "pr",
+     "name": "Pull request",
+     "tools": [
+      "GitHub pull requests",
+      "Pull request template"
+     ],
+     "rule": "A shared workflow changes only through a pull request, never a direct push to the default branch.",
+     "rule_ref": "https://docs.github.com/en/actions/sharing-automations/reusing-workflows",
+     "metric": "pull_requests.commits_via_pr"
+    },
+    {
+     "id": "scan",
+     "name": "Secret scan",
+     "tools": [
+      "Secret scan over the whole history",
+      "Push protection",
+      "Pre-commit hook"
+     ],
+     "rule": "The secret scan runs on every pull request over the whole history and finishes in minutes.",
+     "rule_ref": "https://docs.github.com/en/code-security/secret-scanning/introduction/about-push-protection",
+     "metric": "security.latest_scan_minutes"
+    },
+    {
+     "id": "review",
+     "name": "Review",
+     "tools": [
+      "Pull request reviews",
+      "CODEOWNERS",
+      "Advisory review comment"
+     ],
+     "rule": "A person reviews the head commit before merge, and a fix after review gets a new review.",
+     "rule_ref": "https://google.github.io/eng-practices/review/reviewer/speed.html",
+     "metric": "pull_requests.reviewed"
+    },
+    {
+     "id": "merge",
+     "name": "Merge",
+     "tools": [
+      "Required status check",
+      "Squash merge"
+     ],
+     "rule": "Merge the reviewed head within an hour of every check going green.",
+     "rule_ref": "https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request",
+     "metric": "pull_requests.green_to_merge_minutes"
+    },
+    {
+     "id": "callers",
+     "name": "Callers' next run",
+     "tools": [
+      "Callers pinned to a commit",
+      "Dependabot bump in each caller"
+     ],
+     "rule": "A caller's next run uses the change, and any red main it causes is fixed within minutes.",
+     "rule_ref": "https://docs.github.com/en/actions/reference/security/secure-use",
+     "metric": "ci.main_red_minutes"
+    }
+   ]
+  },
+  {
+   "id": "defaults",
+   "name": "Defaults reach every repo",
+   "why": "A default file edited here, and shown in each repo that has no copy of its own",
+   "ideal": "A default file is short, changed by a small pull request, merged within a day, and shown by every repo without its own.",
+   "sources": [
+    {
+     "title": "GitHub Docs: Creating a default community health file",
+     "url": "https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/creating-a-default-community-health-file",
+     "date": "2026-11-23"
+    },
+    {
+     "title": "GitHub Docs: About community profiles for public repositories",
+     "url": "https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/about-community-profiles-for-public-repositories",
+     "date": "2026-11-23"
+    },
+    {
+     "title": "GitHub Docs: About pull requests",
+     "url": "https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests",
+     "date": "2026-11-23"
+    }
+   ],
+   "critical_path": [
+    "edit",
+    "pr",
+    "merge",
+    "show"
+   ],
+   "steps": [
+    {
+     "id": "edit",
+     "name": "Edit",
+     "tools": [
+      "A default file: issue form, template, policy"
+     ],
+     "rule": "Edit one default file at a time, and keep it short enough that Claude loads nothing past a two-minute read.",
+     "rule_ref": "https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/creating-a-default-community-health-file",
+     "metric": "docs.tokens_past_read_goal"
+    },
+    {
+     "id": "pr",
+     "name": "Pull request",
+     "tools": [
+      "GitHub pull requests"
+     ],
+     "rule": "Open the change as a small pull request, so the effect on every repo is reviewed in one sitting.",
+     "rule_ref": "https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests",
+     "metric": "pull_requests.latest_lines"
+    },
+    {
+     "id": "merge",
+     "name": "Merge",
+     "tools": [
+      "Squash merge"
+     ],
+     "rule": "Merge within a day, so repos without their own copy do not wait for the fix.",
+     "rule_ref": "https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request",
+     "metric": "pull_requests.latest_merge_hours"
+    },
+    {
+     "id": "show",
+     "name": "Repos show it",
+     "tools": [
+      "GitHub's default community health files",
+      "Community profile"
+     ],
+     "rule": "A repo with no copy of its own shows the default, and its community profile stays complete.",
+     "rule_ref": "https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/about-community-profiles-for-public-repositories",
+     "metric": "insights.community_health_pct"
+    }
+   ]
+  }
+ ],
+ "data": "quality/process/data/org.json",
+ "history": null,
+ "out": "quality/dist",
+ "pages": {
+  "process": "process.html"
+ },
+ "tabs": [
+  "build",
+  "ci",
+  "testing"
+ ],
+ "heading": "SoulCraft-Org .github",
+ "collector": "Git Crafter actions/pages",
+ "nav": [
+  {
+   "href": "index.html",
+   "label": "Quality, Speed and Consumption",
+   "icon": "speed"
+  },
+  {
+   "page": "process",
+   "label": "Process",
+   "icon": "plan"
+  }
+ ]
+}

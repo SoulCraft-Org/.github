@@ -1,0 +1,10 @@
+[
+ {
+  "id": "deploy.waiting_merges",
+  "params": {
+   "comment": "pages.yml publishes every push to main through GitHub Pages, read through the GitHub API in CI. Every merge to main counts as shipping.",
+   "platform": "pages",
+   "branch": "origin/main"
+  }
+ }
+]

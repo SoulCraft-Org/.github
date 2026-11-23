@@ -1,0 +1,91 @@
+[
+ {
+  "id": "docs.dead_paths",
+  "params": {
+   "doc_set_left_out": [
+    {
+     "glob": ".github/pull_request_template.md",
+     "why": "a form GitHub copies into each pull request, not a doc read in the repo"
+    }
+   ],
+   "areas": [
+    {
+     "doc": "README.md",
+     "area": [
+      "profile/",
+      "workflow-templates/",
+      "quality/"
+     ]
+    },
+    {
+     "doc": "THREAT-MODEL.md",
+     "area": [
+      ".github/CODEOWNERS",
+      ".github/dependabot.yml",
+      ".pre-commit-config.yaml"
+     ]
+    },
+    {
+     "doc": "CONTRIBUTING.md",
+     "area": [
+      ".github/ISSUE_TEMPLATE/",
+      ".github/pull_request_template.md"
+     ]
+    },
+    {
+     "doc": "AGENTS.md",
+     "area": [
+      ".github/CODEOWNERS",
+      "workflow-templates/",
+      "profile/"
+     ]
+    },
+    {
+     "doc": "CLAUDE.md",
+     "area": [
+      "AGENTS.md"
+     ]
+    },
+    {
+     "doc": "SECURITY.md",
+     "area": []
+    },
+    {
+     "doc": "SUPPORT.md",
+     "area": []
+    },
+    {
+     "doc": "CODE_OF_CONDUCT.md",
+     "area": []
+    },
+    {
+     "doc": "profile/*.md",
+     "area": [
+      "profile/"
+     ]
+    },
+    {
+     "doc": "**",
+     "area": [
+      "{dir}/"
+     ]
+    }
+   ],
+   "comment": "README.md covers every top-level folder (profile, workflow-templates, quality). Pinned workflow files are left out of every area on purpose: Dependabot bumps them, and a bump must not make a doc lag. SECURITY, SUPPORT and CODE_OF_CONDUCT are policies copied into other repos, so each covers nothing here (an empty area, a record)."
+  }
+ },
+ {
+  "id": "docs.dead_scripts",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the repo has no package.json, so no npm script exists for a doc to name; the collector reads could not check."
+  }
+ },
+ {
+  "id": "docs.runbooks_verified",
+  "drop": true,
+  "params": {
+   "comment": "Dropped: the repo holds no runbooks; its docs are the README, the community files and the threat model."
+  }
+ }
+]

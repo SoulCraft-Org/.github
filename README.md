@@ -4,7 +4,7 @@ The org's front door. GitHub reads the profile and the default community files o
 
 ```mermaid
 flowchart LR
-  R[".github (public)"] --> P[Org profile] & D[Default files] & W[Shared workflows]
+  R[".github (public)"] --> P[Org profile] & D[Default files] & W[Shared workflows] & T[Starter workflows]
   W --> C["Repos call them: uses: ...@main"]
 ```
 
@@ -13,6 +13,8 @@ flowchart LR
 | Org profile | The page at [github.com/SoulCraft-Org](https://github.com/SoulCraft-Org) |
 | Default files | Contributing, security, support, conduct, issue forms and a pull request template, for every repo without its own |
 | Shared workflows | `gitleaks.yml`, `gemini-review.yml`, `dependabot-automerge.yml` |
+| Starter workflows | [`workflow-templates/`](workflow-templates/): CI standard, Quality pages, secret scan. Copy one into `.github/workflows/` |
+| Quality pages | [Quality, Speed and Consumption](https://soulcraft-org.github.io/.github/) and the Process page, built by [Git Crafter](https://github.com/SoulCraft-Org/git-crafter) |
 
 ## Call a shared workflow
 
@@ -56,3 +58,5 @@ jobs:
 |---|---|
 | `.github/` | Shared workflows, issue forms, pull request template, code owners, Dependabot config |
 | `profile/` | The org profile page and its images |
+| `quality/` | The Quality and Process pages' config: tabs, targets, 9 process maps |
+| `workflow-templates/` | Starter workflows anyone can copy |

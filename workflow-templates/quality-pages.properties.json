@@ -1,0 +1,7 @@
+{
+ "name": "Quality, Speed and Consumption pages",
+ "description": "Git Crafter's Quality, Speed and Consumption page and Process page for this repository, published to GitHub Pages.",
+ "iconName": "octicon graph",
+ "categories": ["Deployment"],
+ "filePatterns": ["^README\\.md$"]
+}
