@@ -125,3 +125,17 @@ jobs:
       # fail this run.
       - name: no secret anywhere in the history
         run: '"$RUNNER_TEMP/gitleaks" git --config "$RUNNER_TEMP/gitleaks.toml" --gitleaks-ignore-path "$RUNNER_TEMP/gitleaksignore" --log-opts=HEAD --redact --verbose --exit-code 1 .'
+
+      # A pull request's whole change as one diff against its base (the merge preview's first parent), so a secret added
+      # only in a merge commit is seen too. The guard is in the script, not an `if:`, so a push run skips no step.
+      - name: no secret in the pull request's merged change
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "not a pull request: the history scan above covers it"
+            exit 0
+          fi
+          "$RUNNER_TEMP/gitleaks" git --config "$RUNNER_TEMP/gitleaks.toml" --gitleaks-ignore-path "$RUNNER_TEMP/gitleaksignore" \
+            --log-opts="--diff-merges=first-parent -1 HEAD" --redact --verbose --exit-code 1 .

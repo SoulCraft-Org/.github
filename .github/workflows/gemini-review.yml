@@ -41,8 +41,14 @@ jobs:
       id-token: write
       pull-requests: write
     steps:
-      # No checkout: Gemini has no file tools, so the pull request's own files never steer it.
+      # No checkout, and Gemini works in a folder made fresh for this job: Gemini has no file tools, so neither the pull
+      # request's files nor anything an earlier job left on the runner can steer it.
+      - name: Fresh review folder
+        working-directory: ${{ runner.temp }}
+        run: rm -rf review && mkdir review
+
       - name: Prompt context
+        working-directory: ${{ runner.temp }}/review
         env:
           REPOSITORY: ${{ github.repository }}
           PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
@@ -70,6 +76,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/mcp" && tar -xzf "$tgz" -C "$RUNNER_TEMP/mcp" github-mcp-server
 
       - name: Gemini settings
+        working-directory: ${{ runner.temp }}/review
         run: |
           cat > .gemini/settings.json <<JSON
           {
@@ -121,6 +128,7 @@ jobs:
           service_account: ${{ vars.SERVICE_ACCOUNT_EMAIL }}
 
       - name: Gemini review
+        working-directory: ${{ runner.temp }}/review
         env:
           GEMINI_CLI_TRUST_WORKSPACE: 'true'
           GITHUB_TOKEN: ${{ github.token }}
