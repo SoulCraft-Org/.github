@@ -23,8 +23,9 @@ permissions:
 
 jobs:
   gitleaks:
-    # Private SoulCraft-Org repositories run on the organization's own runners; every other caller runs on GitHub's.
-    runs-on: ${{ github.event.repository.private && github.repository_owner == 'SoulCraft-Org' && (vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf') || 'ubuntu-24.04' }}
+    # Private SoulCraft-Org repositories run on the organization's own runners; every other caller runs on GitHub's light
+    # runner. The job is a checkout, one download and one scan, and its timeout is within that runner's 15-minute limit.
+    runs-on: ${{ github.event.repository.private && github.repository_owner == 'SoulCraft-Org' && (vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf') || 'ubuntu-slim' }}
     timeout-minutes: 15
     env:
       VERSION: 8.30.1
