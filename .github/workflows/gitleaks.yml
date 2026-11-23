@@ -89,11 +89,16 @@ jobs:
       # Every commit the pull request adds is checked, not only the final diff, so an allow comment added in one commit
       # and removed in the next is still refused. Only file names and line numbers are printed, never the lines.
       - name: no new allow comments (pull requests)
-        if: github.event_name == 'pull_request'
         shell: bash               # -eo pipefail: a failed git log fails the step instead of finding nothing
         env:
+          EVENT: ${{ github.event_name }}
           BASE: ${{ github.event.pull_request.base.ref }}
         run: |
+          # The guard is here, not an `if:`, so a push run shows no skipped step: it does all its work.
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "not a pull request: no commits to compare with a base"
+            exit 0
+          fi
           marker="gitleaks:""allow"
           hits=$(git log --no-merges --patch --unified=0 --text --no-color --no-ext-diff --format='commit %H' "origin/$BASE..HEAD" |
             awk -v m="$marker" '
