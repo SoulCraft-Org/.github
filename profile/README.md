@@ -89,7 +89,7 @@ Open source, Apache-2.0 unless marked. Ideas start in each repo's Discussions. A
 
 <div align="center">
 
-<img src="divider.svg" width="100%" alt="">
+<img src="divider.svg" width="100%" alt="Thin divider line">
 
 <sub>Questions? <a href="mailto:support@soulcraft.computer">support@soulcraft.computer</a></sub>
 

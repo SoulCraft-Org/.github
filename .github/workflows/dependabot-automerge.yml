@@ -1,12 +1,17 @@
 # Turns on GitHub auto-merge for Dependabot pull requests, majors included. The repository's required checks decide when
 # the merge happens, so a red run never merges. A repository calls it from .github/workflows/dependabot-automerge.yml:
 #
-#   # This file also runs on this repository's own pull requests.
+#   # This file also runs on this repository's own pull requests that touch what Dependabot changes.
 name: dependabot-automerge
 
 on:
   workflow_call:
+  # Only the files this repository's Dependabot entries edit (see dependabot.yml), so a pull request that touches
+  # neither starts no run. A new ecosystem in dependabot.yml adds its manifest here.
   pull_request:
+    paths:
+      - ".github/workflows/**"
+      - ".pre-commit-config.yaml"
 
 permissions: {}
 

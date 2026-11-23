@@ -1,18 +1,17 @@
 name: ci
 
 # Git Crafter's CI standard: its reusable workflow checks every workflow against the standard and runs the short job,
-# here two cheap checks on what this repo holds (the standard itself parses every workflow).
+# here two cheap checks on what this repo holds (the standard itself parses every workflow). It runs on pull requests
+# only: main takes only squash merges of a pull request that passed ci / ci-ok, so a push run would repeat it.
 on:
   pull_request:
-  push:
-    branches: [main]
 
 permissions:
   contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   ci:

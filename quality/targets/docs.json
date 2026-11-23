@@ -6,6 +6,10 @@
     {
      "glob": ".github/pull_request_template.md",
      "why": "a form GitHub copies into each pull request, not a doc read in the repo"
+    },
+    {
+     "glob": "CLAUDE.md",
+     "why": "one import line (@AGENTS.md) that Claude Code loads; it holds no prose to read or to set out as a table or diagram"
     }
    ],
    "areas": [
