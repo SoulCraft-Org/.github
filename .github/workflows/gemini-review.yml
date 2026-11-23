@@ -17,10 +17,10 @@
 # Based on google-github-actions/run-gemini-cli examples/workflows/pr-review.
 name: gemini-review
 
+# Only when another repo calls it: this repo's own pull requests are reviewed before they merge, so a run here would
+# start a runner only to skip while the switch is off.
 on:
   workflow_call:
-  pull_request:
-    types: [opened, reopened, ready_for_review]
 
 permissions: {}
 
