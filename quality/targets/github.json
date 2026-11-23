@@ -41,7 +41,7 @@
   "id": "actions.locked_share",
   "drop": true,
   "params": {
-   "comment": "Dropped: every action is pinned to a full commit SHA in the workflow itself (actions.pinned_share), and a lock file Dependabot cannot update would only repeat it."
+   "comment": "Not adopted: gh actions-lock rewrites each SHA pin to a tag and moves the SHA into the lockfile, and this organization's Actions policy refuses any action not pinned to a full SHA in the workflow. Every action here is SHA-pinned (actions.pinned_share). Revisit when the lockfile can sit beside SHA pins."
   }
  },
  {

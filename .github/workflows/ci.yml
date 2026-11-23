@@ -1,7 +1,7 @@
 name: ci
 
 # Git Crafter's CI standard: its reusable workflow checks every workflow against the standard and runs the short job,
-# here three cheap checks on what this repo holds.
+# here two cheap checks on what this repo holds (the standard itself parses every workflow).
 on:
   pull_request:
   push:
@@ -28,4 +28,3 @@ jobs:
       short: |
         python3 -I -m py_compile profile/make_svgs.py
         git ls-files -z '*.json' | xargs -0 python3 -I -c 'import json, sys; [json.load(open(f, encoding="utf-8")) for f in sys.argv[1:]]'
-        git ls-files -z '*.yml' '*.yaml' | xargs -0 ruby -ryaml -e 'ARGV.each { |f| YAML.load_file(f) }'

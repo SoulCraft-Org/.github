@@ -14,7 +14,7 @@
   "id": "settings.open_repo_missing",
   "drop": true,
   "params": {
-   "comment": "Dropped: it counts Discussions being on as a missing setting, and Discussions are off here by decision; so it cannot reach 0. Its other reads (outside-run approval, private reporting, push protection) stay repo settings to hold by hand; security.secret_scanning_on also reads push protection."
+   "comment": "Dropped: it counts Discussions as a missing setting, and Discussions are off here by decision, so it cannot reach 0. Its other three reads are on and held by the organization's settings as code: outside contributors' runs wait for approval, private vulnerability reporting, and push protection (security.secret_scanning_on also reads push protection)."
   }
  }
 ]
