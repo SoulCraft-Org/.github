@@ -83,7 +83,7 @@
      ],
      "rule": "A shared workflow changes only through a pull request, never a direct push to the default branch.",
      "rule_ref": "https://docs.github.com/en/actions/sharing-automations/reusing-workflows",
-     "metric": "pull_requests.commits_via_pr"
+     "metric": "pull_requests.green_at_head"
     },
     {
      "id": "scan",

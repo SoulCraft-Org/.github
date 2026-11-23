@@ -1,5 +1,12 @@
 [
  {
+  "id": "pull_requests.commits_via_pr",
+  "drop": true,
+  "params": {
+   "comment": "Dropped, for now: this repository's history starts with one seed commit (2026-11-23) that was pushed directly. Every later commit on main goes through a pull request: the organization ruleset requires one and has no bypass actors (read 2026-11-23), so the share cannot read 100 while the seed commit is among the last 20 commits. Put it back once 20 commits have merged after it; settings.main_protected watches the rule itself."
+  }
+ },
+ {
   "id": "issues.open_bugs",
   "params": {
    "comment": "Issue types: Feature joins Bug and Task because Projects are off, so an idea stays an issue and is not parked. Area labels name this repo's three areas. The threat model is reviewed when a shared workflow or a starter changes; the 14-day grace matches the Dependabot cooldown, so a pin bump alone is not a change of surface.",
