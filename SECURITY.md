@@ -2,6 +2,11 @@
 
 Report a vulnerability privately, never in a public issue.
 
+```mermaid
+flowchart LR
+  R[Private report] --> A[Answer within five working days] --> F[Fix ships as a new release]
+```
+
 | Order | How |
 |---|---|
 | 1 | GitHub private vulnerability reporting: the repository's **Security** tab, then **Report a vulnerability** |

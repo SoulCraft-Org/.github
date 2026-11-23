@@ -3,6 +3,11 @@
 SoulCraft repositories are maintained by SoulCraft. Pull requests from outside the organization are welcome on the
 public ones (`comfyui-base`); the workflow repositories are private.
 
+```mermaid
+flowchart LR
+  A[One change] --> B[Your own checks pass] --> C[Pull request] --> D[Required checks green] --> E[Squash merge to main]
+```
+
 **Before a pull request**
 
 - One change per pull request, described in its title and body: what changed and why.
