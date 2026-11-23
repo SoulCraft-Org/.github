@@ -1,6 +1,6 @@
 name: pages-build
 
-# The build both pages workflows share: pages.yml (a push to main, which publishes it) and pages-check.yml (a pull
+# The build both pages workflows share: pages-publish.yml (a push to main, which publishes it) and pages.yml (a pull
 # request, which only builds it, so the docs.unmapped gate runs). Git Crafter's pages (Git Crafter templates/ci/README.md):
 # the Process page and the Quality, Speed and Consumption page, built by Git Crafter's actions/pages from
 # quality/process/config.json and quality/config.json. Keep the pins full commit SHAs with their version comments;
