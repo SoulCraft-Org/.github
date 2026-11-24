@@ -3,40 +3,27 @@
  "$comment": "The written exceptions to the Git Crafter CI standard (tools/ci_standard.py, templates/ci/README.md) for the three reusable workflows other repositories call. A caller's run, not this repository's, holds each one's triggers and concurrency; each exception names its reason.",
  "exceptions": {
   "gitleaks.yml/gitleaks": {
-   "rules": [
-    "runner"
-   ],
+   "rules": ["runner"],
    "why": "A reusable workflow runs on the caller's kind of repository: the label is computed from the caller's visibility, so one fixed hosted label cannot serve a public and a private caller. A public caller runs on the light hosted label."
   },
   "gitleaks.yml": {
-   "rules": [
-    "concurrency"
-   ],
+   "rules": ["concurrency"],
    "why": "A reusable workflow cannot own its caller's concurrency group, and the caller's workflow sets it. The scan is short, and it reads the whole history on every run, so a cancelled older run would only hide a finding."
   },
   "gemini-review.yml/review": {
-   "rules": [
-    "runner",
-    "cache"
-   ],
+   "rules": ["runner", "cache"],
    "why": "runner: computed from the caller's visibility, as gitleaks.yml. cache: the job installs one command-line tool globally at a pinned version, and the repository holds no npm lockfile or package.json, so setup-node has nothing to key a cache on."
   },
   "gemini-review.yml/gate": {
-   "rules": [
-    "runner"
-   ],
+   "rules": ["runner"],
    "why": "Computed from the caller's visibility, as gitleaks.yml: the date gate runs on the same kind of runner as the review it guards."
   },
   "dependabot-automerge.yml/automerge": {
-   "rules": [
-    "runner"
-   ],
+   "rules": ["runner"],
    "why": "Computed from the caller's visibility, as gitleaks.yml: a public caller runs on a standard hosted label."
   },
   "dependabot-automerge.yml": {
-   "rules": [
-    "concurrency"
-   ],
+   "rules": ["concurrency"],
    "why": "A reusable workflow cannot own its caller's concurrency group. The job only turns on auto-merge and checks first whether it is already on, so a repeat run changes nothing."
   }
  }
