@@ -14,6 +14,10 @@
    "rules": ["runner", "cache"],
    "why": "runner: computed from the caller's visibility, as gitleaks.yml. cache: the job installs one command-line tool globally at a pinned version, and the repository holds no npm lockfile or package.json, so setup-node has nothing to key a cache on."
   },
+  "gemini-review.yml/gate": {
+   "rules": ["runner"],
+   "why": "Computed from the caller's visibility, as gitleaks.yml: the date gate runs on the same kind of runner as the review it guards."
+  },
   "dependabot-automerge.yml/automerge": {
    "rules": ["runner"],
    "why": "Computed from the caller's visibility, as gitleaks.yml: a public caller runs on a standard hosted label."
