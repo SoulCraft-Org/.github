@@ -12,7 +12,8 @@
 #
 # Google sign-in is keyless: GitHub's OIDC token goes through a Workload Identity provider, so there is no secret. The
 # caller needs these variables: GCP_WIF_PROVIDER, SERVICE_ACCOUNT_EMAIL, GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION and
-# GOOGLE_GENAI_USE_VERTEXAI. GEMINI_REVIEW=on is the switch: any other value stops every review. Skipped: drafts, pull
+# GOOGLE_GENAI_USE_VERTEXAI. GEMINI_REVIEW=on is the switch: any other value stops every review. GEMINI_REVIEW_UNTIL (YYYY-MM-DD) is the last day of the
+# Cloud credit; after it no review runs (the gate job). Skipped: drafts, pull
 # requests from forks (no OIDC token there) and bot authors such as Dependabot.
 # Based on google-github-actions/run-gemini-cli examples/workflows/pr-review.
 name: gemini-review
@@ -29,11 +30,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  review:
+  # The money guard: GEMINI_REVIEW_UNTIL (an org variable, YYYY-MM-DD) is the last day the Cloud project's credit covers
+  # the calls. After it no review runs, so a linked billing account can never bill a card per call. Set it to the
+  # credit's last day; unset means no end date.
+  gate:
     if: >-
       vars.GEMINI_REVIEW == 'on' && !github.event.pull_request.draft
       && github.event.pull_request.head.repo.full_name == github.repository
       && github.event.pull_request.user.type != 'Bot'
+    runs-on: ${{ github.repository_owner == 'SoulCraft-Org' && github.event.repository.private && (vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf') || 'ubuntu-slim' }}
+    timeout-minutes: 2
+    outputs:
+      ok: ${{ steps.until.outputs.ok }}
+    steps:
+      - name: Inside the credit's dates?
+        id: until
+        env:
+          UNTIL: ${{ vars.GEMINI_REVIEW_UNTIL }}
+        run: |
+          today=$(date -u +%F)
+          if [ -n "$UNTIL" ] && [[ "$today" > "$UNTIL" ]]; then
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No Gemini review: $today is after GEMINI_REVIEW_UNTIL ($UNTIL), the credit's last day."
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  review:
+    needs: gate
+    if: needs.gate.outputs.ok == 'true'
     runs-on: ${{ github.repository_owner == 'SoulCraft-Org' && github.event.repository.private && (vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf') || 'ubuntu-slim' }}
     timeout-minutes: 10
     permissions:
