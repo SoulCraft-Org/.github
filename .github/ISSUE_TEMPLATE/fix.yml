@@ -7,7 +7,7 @@ body:
     id: table
     attributes:
       label: Fix
-      description: "A table with these rows: Where, Change, Why, Files. Add a screenshot, chart or diagram where it helps. No paragraphs."
+      description: "A table with these rows: Where, Change, Why, Files, Evidence. Add a screenshot, chart or diagram where it helps. No paragraphs."
       placeholder: |
         | Field | Value |
         |---|---|
