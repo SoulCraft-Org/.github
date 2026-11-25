@@ -14,6 +14,7 @@ flowchart LR
 | Default files | Contributing, security, support, conduct, issue forms and a pull request template, for every repo without its own |
 | Shared workflows | `gitleaks.yml`, `gemini-review.yml`, `dependabot-automerge.yml` |
 | Starter workflows | [`workflow-templates/`](workflow-templates/): CI standard, Quality pages, secret scan. Copy one into `.github/workflows/` |
+| Spec | [`SPEC.md`](SPEC.md): goals, parts and open choices |
 | Quality pages | [Quality, Speed and Consumption](https://soulcraft-org.github.io/.github/) and the Process page, built by [Git Crafter](https://github.com/SoulCraft-Org/git-crafter) |
 
 ## Call a shared workflow
