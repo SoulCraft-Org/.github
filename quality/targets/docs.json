@@ -51,6 +51,13 @@
      ]
     },
     {
+     "doc": "SPEC.md",
+     "area": [
+      "profile/",
+      "workflow-templates/"
+     ]
+    },
+    {
      "doc": "SECURITY.md",
      "area": []
     },
