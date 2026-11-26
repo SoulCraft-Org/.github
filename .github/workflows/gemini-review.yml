@@ -62,7 +62,7 @@ jobs:
     needs: gate
     if: needs.gate.outputs.ok == 'true'
     runs-on: ${{ github.repository_owner == 'SoulCraft-Org' && github.event.repository.private && (vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf') || 'ubuntu-slim' }}
-    timeout-minutes: 18
+    timeout-minutes: 10
     permissions:
       contents: read
       id-token: write
@@ -159,7 +159,6 @@ jobs:
         env:
           GEMINI_CLI_TRUST_WORKSPACE: 'true'
           GITHUB_TOKEN: ${{ github.token }}
-          GH_TOKEN: ${{ github.token }}
           GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT }}
           GOOGLE_CLOUD_LOCATION: ${{ vars.GOOGLE_CLOUD_LOCATION }}
           GOOGLE_GENAI_USE_VERTEXAI: ${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}
@@ -173,39 +172,21 @@ jobs:
             no event; for submit_pending_pull_request_review call pull_request_review_write with method "submit_pending"
             and event "COMMENT"; inline comments use add_comment_to_pending_review. Use only these GitHub tools.
         run: |
-          # The model call can fail on a transient network error ("fetch failed sending request") and then hang until the
-          # time limit. The review is advisory, so retry once after a pause, but not when this job's token already
-          # started a review on the pull request (a retry would post a second one; a pending review is listed to its
-          # author, so a half-posted one counts). Only a timeout or a network error ends as a warning: any other
-          # failure, such as a sign-in or quota error, still fails the job so someone sees it.
-          reviews() (
-            set -o pipefail
-            gh api "repos/$REPOSITORY/pulls/$PULL_REQUEST_NUMBER/reviews" --paginate \
-              --jq '.[] | select(.user.login == "github-actions[bot]") | .id' | wc -l
-          )
-          can_count=false
-          if command -v gh > /dev/null && before=$(reviews); then can_count=true; else echo "::warning::Cannot count the existing reviews, so a failed attempt will not be retried."; fi
-
-          status=1
-          for attempt in 1 2; do
-            status=0
-            timeout -k 15 360 gemini --yolo --output-format json \
-              --prompt "/pr-code-review Repository: $REPOSITORY. Pull request number: $PULL_REQUEST_NUMBER. $ADDITIONAL_CONTEXT" \
-              < /dev/null > "$RUNNER_TEMP/gemini.json" 2> >(tee "$RUNNER_TEMP/gemini.err" >&2) || status=$?
-            if [ "$status" -eq 0 ]; then break; fi
-            echo "::warning::Gemini review attempt $attempt failed with exit code $status."
-            # Retry only when the count works and no review was started in the meantime.
-            if [ "$can_count" != true ] || ! after=$(reviews) || [ "$after" -gt "$before" ]; then break; fi
-            if [ "$attempt" -lt 2 ]; then sleep 30; fi
-          done
-
+          # The review is advisory, so a timeout or a network error ("fetch failed sending request", which Gemini CLI
+          # retries on its own for the whole time limit) ends as a warning and the job passes. Any other failure, such
+          # as a sign-in or quota error, still fails the job so someone sees it. A retry of the whole call is left out:
+          # it would run on the same runner and network, and could post a second review.
+          status=0
+          timeout -k 15 480 gemini --yolo --output-format json \
+            --prompt "/pr-code-review Repository: $REPOSITORY. Pull request number: $PULL_REQUEST_NUMBER. $ADDITIONAL_CONTEXT" \
+            < /dev/null > "$RUNNER_TEMP/gemini.json" 2> >(tee "$RUNNER_TEMP/gemini.err" >&2) || status=$?
           if [ "$status" -ne 0 ]; then
             if [ "$status" -eq 124 ] || [ "$status" -eq 137 ] || grep -qi 'fetch failed' "$RUNNER_TEMP/gemini.err" 2> /dev/null; then
               echo "::warning::The Gemini review did not finish (exit code $status, a timeout or a network error). It is advisory, so the job passes."
-              echo "The Gemini review did not finish (exit code $status)." >> "$GITHUB_STEP_SUMMARY"
+              echo "The Gemini review did not finish (exit code $status): a timeout or a network error." >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
-            echo "::error::The Gemini review failed with exit code $status, and it is not a timeout or a network error."
+            echo "::error::The Gemini review failed with exit code $status, which is not a timeout or a network error."
             exit "$status"
           fi
           jq -r '.stats // {} | tojson' "$RUNNER_TEMP/gemini.json" | head -c 2000
