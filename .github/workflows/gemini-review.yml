@@ -172,21 +172,22 @@ jobs:
             no event; for submit_pending_pull_request_review call pull_request_review_write with method "submit_pending"
             and event "COMMENT"; inline comments use add_comment_to_pending_review. Use only these GitHub tools.
         run: |
-          # The review is advisory, so a timeout or a network error ("fetch failed sending request", which Gemini CLI
-          # retries on its own for the whole time limit) ends as a warning and the job passes. Any other failure, such
-          # as a sign-in or quota error, still fails the job so someone sees it. A retry of the whole call is left out:
-          # it would run on the same runner and network, and could post a second review.
+          # The review is advisory, so running out of time ends as a warning and the job passes. That is how a network
+          # error ends here: Gemini CLI retries "fetch failed sending request" on its own until the limit, then
+          # `timeout` returns 124. Any other failure, such as a sign-in, quota or turn-limit error, still fails the job
+          # with its own exit code so someone sees it. A retry of the whole call is left out: it would run on the same
+          # runner and network, and could post a second review.
           status=0
           timeout -k 15 480 gemini --yolo --output-format json \
             --prompt "/pr-code-review Repository: $REPOSITORY. Pull request number: $PULL_REQUEST_NUMBER. $ADDITIONAL_CONTEXT" \
-            < /dev/null > "$RUNNER_TEMP/gemini.json" 2> >(tee "$RUNNER_TEMP/gemini.err" >&2) || status=$?
+            < /dev/null > "$RUNNER_TEMP/gemini.json" || status=$?
+          if [ "$status" -eq 124 ]; then
+            echo "::warning::The Gemini review ran out of time (exit code 124), usually a network error. It is advisory, so the job passes."
+            echo "The Gemini review ran out of time (exit code 124), usually a network error." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           if [ "$status" -ne 0 ]; then
-            if [ "$status" -eq 124 ] || [ "$status" -eq 137 ] || grep -qi 'fetch failed' "$RUNNER_TEMP/gemini.err" 2> /dev/null; then
-              echo "::warning::The Gemini review did not finish (exit code $status, a timeout or a network error). It is advisory, so the job passes."
-              echo "The Gemini review did not finish (exit code $status): a timeout or a network error." >> "$GITHUB_STEP_SUMMARY"
-              exit 0
-            fi
-            echo "::error::The Gemini review failed with exit code $status, which is not a timeout or a network error."
+            echo "::error::The Gemini review failed with exit code $status."
             exit "$status"
           fi
           jq -r '.stats // {} | tojson' "$RUNNER_TEMP/gemini.json" | head -c 2000
