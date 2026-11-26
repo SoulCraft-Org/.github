@@ -62,7 +62,7 @@ jobs:
     needs: gate
     if: needs.gate.outputs.ok == 'true'
     runs-on: ${{ github.repository_owner == 'SoulCraft-Org' && github.event.repository.private && (vars.CI_POOL == 'on' && 'soulcraft-free' || 'soulcraft-hf') || 'ubuntu-slim' }}
-    timeout-minutes: 10
+    timeout-minutes: 18
     permissions:
       contents: read
       id-token: write
@@ -159,6 +159,7 @@ jobs:
         env:
           GEMINI_CLI_TRUST_WORKSPACE: 'true'
           GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
           GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT }}
           GOOGLE_CLOUD_LOCATION: ${{ vars.GOOGLE_CLOUD_LOCATION }}
           GOOGLE_GENAI_USE_VERTEXAI: ${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}
@@ -172,6 +173,30 @@ jobs:
             no event; for submit_pending_pull_request_review call pull_request_review_write with method "submit_pending"
             and event "COMMENT"; inline comments use add_comment_to_pending_review. Use only these GitHub tools.
         run: |
-          timeout 480 gemini --yolo --output-format json \
-            --prompt "/pr-code-review Repository: $REPOSITORY. Pull request number: $PULL_REQUEST_NUMBER. $ADDITIONAL_CONTEXT" < /dev/null > "$RUNNER_TEMP/gemini.json"
+          # The model call can fail on a transient network error ("fetch failed sending request") and then hang until the
+          # time limit. The review is advisory, so retry once after a pause, but not when a review already posted (a
+          # retry would post a second one), and end a final failure as a warning so the pull request never turns red.
+          reviews() {
+            gh api "repos/$REPOSITORY/pulls/$PULL_REQUEST_NUMBER/reviews" --paginate \
+              --jq '.[] | select(.user.login == "github-actions[bot]") | .id' | wc -l
+          }
+          can_count=false
+          if command -v gh > /dev/null && before=$(reviews 2> /dev/null); then can_count=true; fi
+
+          status=1
+          for attempt in 1 2; do
+            status=0
+            timeout 360 gemini --yolo --output-format json \
+              --prompt "/pr-code-review Repository: $REPOSITORY. Pull request number: $PULL_REQUEST_NUMBER. $ADDITIONAL_CONTEXT" < /dev/null > "$RUNNER_TEMP/gemini.json" || status=$?
+            if [ "$status" -eq 0 ]; then break; fi
+            echo "::warning::Gemini review attempt $attempt failed with exit code $status."
+            # Without a count of the reviews already posted, a retry could post a second one, so do not retry.
+            if [ "$can_count" != true ] || [ "$(reviews)" -gt "$before" ]; then break; fi
+            if [ "$attempt" -lt 2 ]; then sleep 30; fi
+          done
+
+          if [ "$status" -ne 0 ]; then
+            echo "::warning::The Gemini review did not finish (exit code $status). It is advisory, so the job passes."
+            exit 0
+          fi
           jq -r '.stats // {} | tojson' "$RUNNER_TEMP/gemini.json" | head -c 2000
